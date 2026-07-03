@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { DayRecord, JobPlanType } from '../types'
+import type { DayRecord, JobPlanType, JobPlan } from '../types'
 import { getTodayStr } from '../utils/date'
 import EditableTag from './EditableTag'
 
@@ -8,6 +8,7 @@ interface Props {
   onComplete: () => void
   onClose: () => void
   updateData: (fn: (d: any) => void) => void
+  initialMode?: 'plan' | 'done'
 }
 
 const PLAN_OPTIONS: { type: JobPlanType; label: string; icon: string; hasCount: boolean; countLabel: string }[] = [
@@ -22,9 +23,9 @@ const DEFAULT_COUNTS: Record<string, number> = {
   submit: 5,
 }
 
-export default function JobModal({ record, onComplete, onClose, updateData }: Props) {
+export default function JobModal({ record, onComplete, onClose, updateData, initialMode }: Props) {
   const [mode, setMode] = useState<'plan' | 'done'>(
-    record.modules.job.plans.length > 0 ? 'done' : 'plan'
+    initialMode ?? (record.modules.job.plans.length > 0 ? 'done' : 'plan')
   )
   const [selectedPlans, setSelectedPlans] = useState<JobPlanType[]>(
     record.modules.job.plans.map(p => p.type)
@@ -51,7 +52,7 @@ export default function JobModal({ record, onComplete, onClose, updateData }: Pr
         timestamp: now,
       }))
     })
-    setMode('done')
+    onClose()
   }
 
   const handleDone = () => {
@@ -59,11 +60,15 @@ export default function JobModal({ record, onComplete, onClose, updateData }: Pr
       const today = d.records.find((r: DayRecord) => r.date === getTodayStr())
       if (!today) return
       const now = new Date().toISOString()
-      today.modules.job.dones = Array.from(doneSet).map(type => ({
-        type: type as JobPlanType,
-        count: doneCounts[type] ?? DEFAULT_COUNTS[type],
-        timestamp: now,
-      }))
+      today.modules.job.dones = Array.from(doneSet).map(type => {
+        const plan = today.modules.job.plans.find((p: JobPlan) => p.type === type)
+        return {
+          type: type as JobPlanType,
+          count: doneCounts[type] ?? DEFAULT_COUNTS[type],
+          customText: plan?.customText,
+          timestamp: now,
+        }
+      })
       if (doneSet.size > 0) {
         today.modules.job.completed = true
       }

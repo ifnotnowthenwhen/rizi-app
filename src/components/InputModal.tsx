@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { DayRecord, InputPlanType } from '../types'
+import type { DayRecord, InputPlanType, InputPlan } from '../types'
 import { getTodayStr } from '../utils/date'
 import EditableTag from './EditableTag'
 
@@ -8,6 +8,7 @@ interface Props {
   onComplete: () => void
   onClose: () => void
   updateData: (fn: (d: any) => void) => void
+  initialMode?: 'plan' | 'done'
 }
 
 const PLAN_OPTIONS: { type: InputPlanType; label: string; icon: string }[] = [
@@ -17,9 +18,9 @@ const PLAN_OPTIONS: { type: InputPlanType; label: string; icon: string }[] = [
   { type: 'case', label: '看案例', icon: '🔍' },
 ]
 
-export default function InputModal({ record, onComplete, onClose, updateData }: Props) {
+export default function InputModal({ record, onComplete, onClose, updateData, initialMode }: Props) {
   const hasPlans = record.modules.input.plans.length > 0
-  const [mode, setMode] = useState<'plan' | 'done'>(hasPlans ? 'done' : 'plan')
+  const [mode, setMode] = useState<'plan' | 'done'>(initialMode ?? (hasPlans ? 'done' : 'plan'))
   const [selectedPlans, setSelectedPlans] = useState<InputPlanType[]>(
     record.modules.input.plans.map(p => p.type)
   )
@@ -49,7 +50,7 @@ export default function InputModal({ record, onComplete, onClose, updateData }: 
         timestamp: new Date().toISOString(),
       }))
     })
-    setMode('done')
+    onClose()
   }
 
   const toggleDone = (type: string) => {
@@ -65,12 +66,16 @@ export default function InputModal({ record, onComplete, onClose, updateData }: 
     updateData((d: any) => {
       const today = d.records.find((r: DayRecord) => r.date === getTodayStr())
       if (!today) return
-      today.modules.input.dones = Array.from(doneSet).map(type => ({
-        type: type as InputPlanType,
-        duration: doneDurations[type] ?? 30,
-        content: doneContents[type] || undefined,
-        timestamp: new Date().toISOString(),
-      }))
+      today.modules.input.dones = Array.from(doneSet).map(type => {
+        const plan = today.modules.input.plans.find((p: InputPlan) => p.type === type)
+        return {
+          type: type as InputPlanType,
+          duration: doneDurations[type] ?? 30,
+          content: doneContents[type] || undefined,
+          customText: plan?.customText,
+          timestamp: new Date().toISOString(),
+        }
+      })
       if (doneSet.size > 0) today.modules.input.completed = true
     })
     if (doneSet.size > 0) onComplete()

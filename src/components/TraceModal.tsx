@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { DayRecord, TracePlanType } from '../types'
+import type { DayRecord, TracePlanType, TracePlan } from '../types'
 import { getTodayStr } from '../utils/date'
 
 interface Props {
@@ -7,6 +7,7 @@ interface Props {
   onComplete: () => void
   onClose: () => void
   updateData: (fn: (d: any) => void) => void
+  initialMode?: 'plan' | 'done'
 }
 
 const PLAN_OPTIONS: { type: TracePlanType; label: string; icon: string }[] = [
@@ -15,9 +16,9 @@ const PLAN_OPTIONS: { type: TracePlanType; label: string; icon: string }[] = [
   { type: 'chore', label: '家务', icon: '🧹' },
 ]
 
-export default function TraceModal({ record, onComplete, onClose, updateData }: Props) {
+export default function TraceModal({ record, onComplete, onClose, updateData, initialMode }: Props) {
   const hasPlans = record.modules.trace.plans.length > 0
-  const [mode, setMode] = useState<'plan' | 'done'>(hasPlans ? 'done' : 'plan')
+  const [mode, setMode] = useState<'plan' | 'done'>(initialMode ?? (hasPlans ? 'done' : 'plan'))
   const [selectedPlans, setSelectedPlans] = useState<TracePlanType[]>(
     record.modules.trace.plans.map(p => p.type)
   )
@@ -44,7 +45,7 @@ export default function TraceModal({ record, onComplete, onClose, updateData }: 
         timestamp: new Date().toISOString(),
       }))
     })
-    setMode('done')
+    onClose()
   }
 
   const toggleDone = (type: string) => {
@@ -60,11 +61,15 @@ export default function TraceModal({ record, onComplete, onClose, updateData }: 
     updateData((d: any) => {
       const today = d.records.find((r: DayRecord) => r.date === getTodayStr())
       if (!today) return
-      today.modules.trace.dones = Array.from(doneSet).map(type => ({
-        type: type as TracePlanType,
-        description: doneDescriptions[type] || undefined,
-        timestamp: new Date().toISOString(),
-      }))
+      today.modules.trace.dones = Array.from(doneSet).map(type => {
+        const plan = today.modules.trace.plans.find((p: TracePlan) => p.type === type)
+        return {
+          type: type as TracePlanType,
+          description: doneDescriptions[type] || undefined,
+          customText: plan?.customText,
+          timestamp: new Date().toISOString(),
+        }
+      })
       if (doneSet.size > 0) today.modules.trace.completed = true
     })
     if (doneSet.size > 0) onComplete()

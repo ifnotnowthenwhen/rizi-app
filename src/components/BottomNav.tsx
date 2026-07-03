@@ -6,8 +6,8 @@ interface Props {
 }
 
 const tabs: { key: TabType; icon: string; label: string }[] = [
-  { key: 'home', icon: '🌱', label: '一日' },
   { key: 'weekly', icon: '📅', label: '一周' },
+  { key: 'home', icon: '🌱', label: '一日' },
   { key: 'today', icon: '👀', label: '回顾' },
 ]
 

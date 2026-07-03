@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { DayRecord, BodyPlanType } from '../types'
+import type { DayRecord, BodyPlanType, BodyPlan } from '../types'
 import { getTodayStr } from '../utils/date'
 import EditableTag from './EditableTag'
 
@@ -8,6 +8,7 @@ interface Props {
   onComplete: () => void
   onClose: () => void
   updateData: (fn: (d: any) => void) => void
+  initialMode?: 'plan' | 'done'
 }
 
 const PLAN_OPTIONS: { type: BodyPlanType; label: string; icon: string }[] = [
@@ -16,9 +17,9 @@ const PLAN_OPTIONS: { type: BodyPlanType; label: string; icon: string }[] = [
   { type: 'exercise', label: '健身操', icon: '🤸' },
 ]
 
-export default function BodyModal({ record, onComplete, onClose, updateData }: Props) {
+export default function BodyModal({ record, onComplete, onClose, updateData, initialMode }: Props) {
   const hasPlans = record.modules.body.plans.length > 0
-  const [mode, setMode] = useState<'plan' | 'done'>(hasPlans ? 'done' : 'plan')
+  const [mode, setMode] = useState<'plan' | 'done'>(initialMode ?? (hasPlans ? 'done' : 'plan'))
   const [selectedPlans, setSelectedPlans] = useState<BodyPlanType[]>(
     record.modules.body.plans.map(p => p.type)
   )
@@ -45,7 +46,7 @@ export default function BodyModal({ record, onComplete, onClose, updateData }: P
         timestamp: new Date().toISOString(),
       }))
     })
-    setMode('done')
+    onClose()
   }
 
   const toggleDone = (type: string) => {
@@ -61,11 +62,15 @@ export default function BodyModal({ record, onComplete, onClose, updateData }: P
     updateData((d: any) => {
       const today = d.records.find((r: DayRecord) => r.date === getTodayStr())
       if (!today) return
-      today.modules.body.dones = Array.from(doneSet).map(type => ({
-        type: type as BodyPlanType,
-        duration: doneDurations[type] ?? 20,
-        timestamp: new Date().toISOString(),
-      }))
+      today.modules.body.dones = Array.from(doneSet).map(type => {
+        const plan = today.modules.body.plans.find((p: BodyPlan) => p.type === type)
+        return {
+          type: type as BodyPlanType,
+          duration: doneDurations[type] ?? 20,
+          customText: plan?.customText,
+          timestamp: new Date().toISOString(),
+        }
+      })
       if (doneSet.size > 0) today.modules.body.completed = true
     })
     if (doneSet.size > 0) onComplete()

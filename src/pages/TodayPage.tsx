@@ -52,13 +52,40 @@ export default function TodayPage() {
     doneTypesByModule[m] = new Set(todayRecord.modules[m].dones.map(d => d.type))
   }
 
-  const allDones: { time: string; icon: string; label: string }[] = []
+  const allDones: { time: string; icon: string; text: string }[] = []
   for (const m of MODULE_ORDER) {
     for (const done of todayRecord.modules[m].dones) {
       const t = new Date(done.timestamp)
       const time = `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`
       const info = MODULE_INFO[m]
-      allDones.push({ time, icon: info.icon, label: info.label })
+      let detail = ''
+      if (m === 'job') {
+        const j = done as any
+        const jLabels: Record<string, string> = { collect: '收藏', submit: '投递', resume: '修改简历', portfolio: '修改作品集' }
+        detail = jLabels[j.type] || j.type
+        if (j.count) detail += ` ${j.count}${j.type === 'collect' ? ' 个' : ' 份'}`
+        if (j.type === 'custom') detail = j.customText || '干点别的'
+      } else if (m === 'input') {
+        const i = done as any
+        const iLabels: Record<string, string> = { read: '阅读', study: '学习', course: '看课程', case: '看案例' }
+        detail = iLabels[i.type] || i.type
+        if (i.content) detail += `《${i.content}》`
+        if (i.duration) detail += ` ${i.duration} 分钟`
+        if (i.type === 'custom') detail = i.customText || '干点别的'
+      } else if (m === 'body') {
+        const b = done as any
+        const bLabels: Record<string, string> = { walk: '散步', bike: '骑车', exercise: '健身操' }
+        detail = bLabels[b.type] || b.type
+        if (b.duration) detail += ` ${b.duration} 分钟`
+        if (b.type === 'custom') detail = b.customText || '干点别的'
+      } else if (m === 'trace') {
+        const t = done as any
+        const tLabels: Record<string, string> = { diary: '日记', write: '写作', chore: '做家务' }
+        detail = tLabels[t.type] || t.type
+        if (t.description) detail += ` · ${t.description}`
+        if (t.type === 'custom') detail = t.customText || '干点别的'
+      }
+      allDones.push({ time, icon: info.icon, text: detail })
     }
   }
   allDones.sort((a, b) => b.time.localeCompare(a.time))
@@ -86,7 +113,7 @@ export default function TodayPage() {
             {allDones.map((d, i) => (
               <div key={i} className="flex items-center gap-2.5 py-1.5 text-xs text-deep-brown border-b border-cream last:border-0">
                 <span className="w-4 h-4 rounded-full bg-sage flex items-center justify-center text-white text-[10px] flex-shrink-0">✓</span>
-                <span>{d.icon} {d.label}</span>
+                <span>{d.icon} {d.text}</span>
                 <span className="ml-auto text-light-brown">{d.time}</span>
               </div>
             ))}
