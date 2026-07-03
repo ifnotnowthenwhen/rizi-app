@@ -6,6 +6,7 @@ import ProgressBar from '../components/ProgressBar'
 import ModuleCard from '../components/ModuleCard'
 import FeedbackBanner from '../components/FeedbackBanner'
 import JobModal from '../components/JobModal'
+import InputModal from '../components/InputModal'
 import type { ModuleType, DayRecord, AppData, JobPlanType } from '../types'
 
 const MODULES: { key: ModuleType; icon: string; label: string }[] = [
@@ -76,7 +77,7 @@ export default function HomePage() {
         />
       )}
       {activeModal === 'input' && (
-        <InputModalContent
+        <InputModal
           record={todayRecord}
           onComplete={() => handleModuleComplete('input')}
           onClose={() => setActiveModal(null)}
@@ -100,18 +101,6 @@ export default function HomePage() {
         />
       )}
     </div>
-  )
-}
-
-/* === Input Modal (placeholder) === */
-function InputModalContent({ record, onComplete, onClose, updateData }: {
-  record: DayRecord; onComplete: () => void; onClose: () => void; updateData: (fn: (d: AppData) => void) => void
-}) {
-  return (
-    <ModalShell icon="📖" onClose={onClose}>
-      <p className="text-center text-xs text-deep-brown mt-2">输入模块（将在后续任务实现）</p>
-      <button onClick={onClose} className="mt-4 w-full py-2.5 rounded-xl text-sm text-white bg-sage">关闭</button>
-    </ModalShell>
   )
 }
 
