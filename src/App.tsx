@@ -2,6 +2,7 @@ import { useState } from 'react'
 import BottomNav from './components/BottomNav'
 import HomePage from './pages/HomePage'
 import WeeklyPage from './pages/WeeklyPage'
+import TodayPage from './pages/TodayPage'
 import type { TabType } from './types'
 
 export default function App() {
@@ -12,7 +13,7 @@ export default function App() {
       <main className="flex-1 overflow-y-auto px-4 pb-20">
         {activeTab === 'home' && <HomePage />}
         {activeTab === 'weekly' && <WeeklyPage />}
-        {activeTab === 'today' && <div className="flex items-center justify-center h-64 text-deep-brown text-sm">回顾页面</div>}
+        {activeTab === 'today' && <TodayPage />}
       </main>
       <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
     </div>
