@@ -26,13 +26,11 @@ export default function TraceModal({ record, onComplete, onClose, updateData, in
   const [doneDescriptions, setDoneDescriptions] = useState<Record<string, string>>(
     Object.fromEntries(record.modules.trace.dones.map(d => [d.type, d.description ?? '']))
   )
-  const [doneSet, setDoneSet] = useState<Set<string>>(
-    new Set(
-      record.modules.trace.plans
-        .map((p, idx) => record.modules.trace.dones.some(d => d.type === p.type) ? `${p.type}-${idx}` : null)
-        .filter(Boolean) as string[]
-    )
-  )
+  const [doneSet, setDoneSet] = useState<Set<string>>(new Set(
+    record.modules.trace.plans
+      .filter(p => record.modules.trace.dones.some(d => d.type === p.type && d.customText === p.customText))
+      .map(p => p.id || p.type)
+  ))
 
   const togglePlan = (type: TracePlanType) => {
     setSelectedPlans(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type])
@@ -43,9 +41,10 @@ export default function TraceModal({ record, onComplete, onClose, updateData, in
       const today = d.records.find((r: DayRecord) => r.date === getTodayStr())
       if (!today) return
       const now = new Date().toISOString()
+      const makeId = () => `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
       today.modules.trace.plans = [
-        ...selectedPlans.map(type => ({ type, timestamp: now })),
-        ...customEntries.map(ce => ({ type: 'custom' as TracePlanType, customText: ce.text || undefined, timestamp: now })),
+        ...selectedPlans.map(type => ({ id: makeId(), type, timestamp: now })),
+        ...customEntries.map(ce => ({ id: makeId(), type: 'custom' as TracePlanType, customText: ce.text || undefined, timestamp: now })),
       ]
     })
     onClose()
@@ -66,12 +65,10 @@ export default function TraceModal({ record, onComplete, onClose, updateData, in
       if (!today) return
       const now = new Date().toISOString()
       today.modules.trace.dones = Array.from(doneSet).map(doneKey => {
-        const [type, idxStr] = doneKey.split('-')
-        const idx = parseInt(idxStr, 10)
-        const plan = today.modules.trace.plans[idx]
+        const plan = today.modules.trace.plans.find((p: any) => (p.id || p.type) === doneKey)
         return {
-          type: type as TracePlanType,
-          description: doneDescriptions[type] || undefined,
+          type: (plan?.type || 'custom') as TracePlanType,
+          description: doneDescriptions[plan?.type ?? ''] || undefined,
           customText: plan?.customText,
           timestamp: now,
         }
@@ -152,8 +149,8 @@ export default function TraceModal({ record, onComplete, onClose, updateData, in
         ) : (
           <>
             <div className="flex flex-col gap-3">
-              {displayedPlans.map((plan, idx) => {
-                const doneKey = `${plan.type}-${idx}`
+              {displayedPlans.map(plan => {
+                const doneKey = plan.id || `${plan.type}-0`
                 return (
                   <div key={doneKey} className="bg-white rounded-xl px-4 py-3 border border-warm-gray">
                     <div className="flex items-center gap-2.5" onClick={() => toggleDone(doneKey)}>

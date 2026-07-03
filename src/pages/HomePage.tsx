@@ -47,20 +47,53 @@ export default function HomePage() {
     setJustCompleted(module)
   }
 
-  const handleItemDone = (module: ModuleType, planType: string) => {
-    const plan = todayRecord.modules[module].plans.find(p => p.type === planType)
+  const getItemKey = (plan: any) => {
+    if (plan.type === 'custom') return `custom::${plan.customText || ''}::${plan.id || ''}`
+    return plan.type
+  }
+
+  const handleItemDone = (module: ModuleType, itemKey: string) => {
     updateData(d => {
       const record = d.records.find((r: any) => r.date === getTodayStr())
       if (!record) return
-      // Remove from plans
-      record.modules[module].plans = (record.modules[module].plans as any[]).filter(
-        (p: any) => p.type !== planType
-      ) as any
+
+      const plans = record.modules[module].plans
+      let foundPlan: any = null
+      let planIdx = -1
+
+      if (itemKey.startsWith('custom::')) {
+        // Custom plan: find by id (third part of key)
+        const parts = itemKey.split('::')
+        const customId = parts[2]
+        planIdx = plans.findIndex((p: any) => p.id === customId)
+        if (planIdx === -1) {
+          // Fallback: match by customText if no id match
+          const customText = parts[1]
+          planIdx = plans.findIndex((p: any) => p.type === 'custom' && p.customText === customText)
+        }
+      } else {
+        // Regular plan: find by type
+        planIdx = plans.findIndex((p: any) => p.type === itemKey)
+      }
+
+      if (planIdx === -1) return
+      foundPlan = plans[planIdx]
+
+      // Remove the specific plan
+      record.modules[module].plans = [
+        ...plans.slice(0, planIdx),
+        ...plans.slice(planIdx + 1),
+      ] as any
+
       // Add to dones
       const now = new Date().toISOString()
-      const doneEntry: any = { type: planType, timestamp: now }
-      if (plan?.customText) doneEntry.customText = plan.customText
+      const doneEntry: any = {
+        type: foundPlan.type,
+        timestamp: now,
+      }
+      if (foundPlan.customText) doneEntry.customText = foundPlan.customText
       record.modules[module].dones.push(doneEntry)
+
       if (record.modules[module].dones.length > 0) {
         record.modules[module].completed = true
       }
@@ -99,7 +132,7 @@ export default function HomePage() {
           const moduleData = todayRecord.modules[m.key]
           const hasPlans = moduleData.plans.length > 0
           const allDone = hasPlans && moduleData.plans.every(p =>
-            moduleData.dones.some(d => d.type === p.type)
+            moduleData.dones.some(d => d.type === p.type && (d.customText || '') === (p.customText || ''))
           )
 
           return (
@@ -145,15 +178,15 @@ export default function HomePage() {
                 {hasPlans ? (
                   <div className="flex flex-col gap-1.5">
                     {moduleData.plans.map(plan => {
-                      const isDone = moduleData.dones.some(d => d.type === plan.type)
+                      const isDone = moduleData.dones.some(d => d.type === plan.type && (d.customText || '') === (plan.customText || ''))
                       const label = getPlanLabel(m.key, plan.type, plan.customText)
 
                       if (isDone) return null // Don't show done items
 
                       return (
                         <div
-                          key={plan.type + (plan.customText || '')}
-                          onClick={() => handleItemDone(m.key, plan.type)}
+                          key={plan.id || plan.type + (plan.customText || '')}
+                          onClick={() => handleItemDone(m.key, getItemKey(plan))}
                           className="flex items-center gap-3 py-2 px-3 rounded-xl hover:bg-cream cursor-pointer group transition-colors"
                         >
                           <span className="w-5 h-5 rounded-full border-2 border-light-brown flex items-center justify-center group-hover:border-sage transition-colors flex-shrink-0">

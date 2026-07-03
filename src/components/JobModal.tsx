@@ -36,22 +36,21 @@ export default function JobModal({ record, onComplete, onClose, updateData, init
       record.modules.job.dones.map(d => [d.type, d.count ?? DEFAULT_COUNTS[d.type] ?? 0])
     )
   )
-  const [doneSet, setDoneSet] = useState<Set<string>>(
-    new Set(
-      record.modules.job.plans
-        .map((p, idx) => record.modules.job.dones.some(d => d.type === p.type) ? `${p.type}-${idx}` : null)
-        .filter(Boolean) as string[]
-    )
-  )
+  const [doneSet, setDoneSet] = useState<Set<string>>(new Set(
+    record.modules.job.plans
+      .filter(p => record.modules.job.dones.some(d => d.type === p.type && d.customText === p.customText))
+      .map(p => p.id || p.type)
+  ))
 
   const handlePlan = () => {
     updateData((d: any) => {
       const today = d.records.find((r: DayRecord) => r.date === getTodayStr())
       if (!today) return
       const now = new Date().toISOString()
+      const makeId = () => `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
       today.modules.job.plans = [
-        ...selectedPlans.map(type => ({ type, timestamp: now })),
-        ...customEntries.map(ce => ({ type: 'custom' as JobPlanType, customText: ce.text || undefined, timestamp: now })),
+        ...selectedPlans.map(type => ({ id: makeId(), type, timestamp: now })),
+        ...customEntries.map(ce => ({ id: makeId(), type: 'custom' as JobPlanType, customText: ce.text || undefined, timestamp: now })),
       ]
     })
     onClose()
@@ -63,12 +62,10 @@ export default function JobModal({ record, onComplete, onClose, updateData, init
       if (!today) return
       const now = new Date().toISOString()
       today.modules.job.dones = Array.from(doneSet).map(doneKey => {
-        const [type, idxStr] = doneKey.split('-')
-        const idx = parseInt(idxStr, 10)
-        const plan = today.modules.job.plans[idx]
+        const plan = today.modules.job.plans.find((p: any) => (p.id || p.type) === doneKey)
         return {
-          type: type as JobPlanType,
-          count: doneCounts[type] ?? DEFAULT_COUNTS[type],
+          type: (plan?.type || 'custom') as JobPlanType,
+          count: doneCounts[plan?.type ?? ''] ?? DEFAULT_COUNTS[plan?.type ?? ''],
           customText: plan?.customText,
           timestamp: now,
         }
@@ -189,8 +186,8 @@ export default function JobModal({ record, onComplete, onClose, updateData, init
         ) : (
           <>
             <div className="flex flex-col gap-2">
-              {displayedPlans.map((plan, idx) => {
-                const doneKey = `${plan.type}-${idx}`
+              {displayedPlans.map(plan => {
+                const doneKey = plan.id || `${plan.type}-0`
                 const opt = PLAN_OPTIONS.find(o => o.type === plan.type)
                 return (
                   <div key={doneKey} className="bg-white rounded-xl px-4 py-3 border border-warm-gray">

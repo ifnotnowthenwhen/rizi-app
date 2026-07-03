@@ -31,13 +31,11 @@ export default function InputModal({ record, onComplete, onClose, updateData, in
   const [doneContents, setDoneContents] = useState<Record<string, string>>(
     Object.fromEntries(record.modules.input.dones.map(d => [d.type, d.content ?? '']))
   )
-  const [doneSet, setDoneSet] = useState<Set<string>>(
-    new Set(
-      record.modules.input.plans
-        .map((p, idx) => record.modules.input.dones.some(d => d.type === p.type) ? `${p.type}-${idx}` : null)
-        .filter(Boolean) as string[]
-    )
-  )
+  const [doneSet, setDoneSet] = useState<Set<string>>(new Set(
+    record.modules.input.plans
+      .filter(p => record.modules.input.dones.some(d => d.type === p.type && d.customText === p.customText))
+      .map(p => p.id || p.type)
+  ))
 
   const togglePlan = (type: InputPlanType) => {
     setSelectedPlans(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type])
@@ -48,9 +46,10 @@ export default function InputModal({ record, onComplete, onClose, updateData, in
       const today = d.records.find((r: DayRecord) => r.date === getTodayStr())
       if (!today) return
       const now = new Date().toISOString()
+      const makeId = () => `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
       today.modules.input.plans = [
-        ...selectedPlans.map(type => ({ type, timestamp: now })),
-        ...customEntries.map(ce => ({ type: 'custom' as InputPlanType, customText: ce.text || undefined, timestamp: now })),
+        ...selectedPlans.map(type => ({ id: makeId(), type, timestamp: now })),
+        ...customEntries.map(ce => ({ id: makeId(), type: 'custom' as InputPlanType, customText: ce.text || undefined, timestamp: now })),
       ]
     })
     onClose()
@@ -71,13 +70,11 @@ export default function InputModal({ record, onComplete, onClose, updateData, in
       if (!today) return
       const now = new Date().toISOString()
       today.modules.input.dones = Array.from(doneSet).map(doneKey => {
-        const [type, idxStr] = doneKey.split('-')
-        const idx = parseInt(idxStr, 10)
-        const plan = today.modules.input.plans[idx]
+        const plan = today.modules.input.plans.find((p: any) => (p.id || p.type) === doneKey)
         return {
-          type: type as InputPlanType,
-          duration: doneDurations[type] ?? 30,
-          content: doneContents[type] || undefined,
+          type: (plan?.type || 'custom') as InputPlanType,
+          duration: doneDurations[plan?.type ?? ''] ?? 30,
+          content: doneContents[plan?.type ?? ''] || undefined,
           customText: plan?.customText,
           timestamp: now,
         }
@@ -158,8 +155,8 @@ export default function InputModal({ record, onComplete, onClose, updateData, in
         ) : (
           <>
             <div className="flex flex-col gap-3">
-              {displayedPlans.map((plan, idx) => {
-                const doneKey = `${plan.type}-${idx}`
+              {displayedPlans.map(plan => {
+                const doneKey = plan.id || `${plan.type}-0`
                 return (
                   <div key={doneKey} className="bg-white rounded-xl px-4 py-3 border border-warm-gray">
                     <div className="flex items-center gap-2.5" onClick={() => toggleDone(doneKey)}>

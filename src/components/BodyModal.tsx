@@ -27,13 +27,11 @@ export default function BodyModal({ record, onComplete, onClose, updateData, ini
   const [doneDurations, setDoneDurations] = useState<Record<string, number>>(
     Object.fromEntries(record.modules.body.dones.map(d => [d.type, d.duration ?? 20]))
   )
-  const [doneSet, setDoneSet] = useState<Set<string>>(
-    new Set(
-      record.modules.body.plans
-        .map((p, idx) => record.modules.body.dones.some(d => d.type === p.type) ? `${p.type}-${idx}` : null)
-        .filter(Boolean) as string[]
-    )
-  )
+  const [doneSet, setDoneSet] = useState<Set<string>>(new Set(
+    record.modules.body.plans
+      .filter(p => record.modules.body.dones.some(d => d.type === p.type && d.customText === p.customText))
+      .map(p => p.id || p.type)
+  ))
 
   const togglePlan = (type: BodyPlanType) => {
     setSelectedPlans(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type])
@@ -44,9 +42,10 @@ export default function BodyModal({ record, onComplete, onClose, updateData, ini
       const today = d.records.find((r: DayRecord) => r.date === getTodayStr())
       if (!today) return
       const now = new Date().toISOString()
+      const makeId = () => `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
       today.modules.body.plans = [
-        ...selectedPlans.map(type => ({ type, timestamp: now })),
-        ...customEntries.map(ce => ({ type: 'custom' as BodyPlanType, customText: ce.text || undefined, timestamp: now })),
+        ...selectedPlans.map(type => ({ id: makeId(), type, timestamp: now })),
+        ...customEntries.map(ce => ({ id: makeId(), type: 'custom' as BodyPlanType, customText: ce.text || undefined, timestamp: now })),
       ]
     })
     onClose()
@@ -67,12 +66,10 @@ export default function BodyModal({ record, onComplete, onClose, updateData, ini
       if (!today) return
       const now = new Date().toISOString()
       today.modules.body.dones = Array.from(doneSet).map(doneKey => {
-        const [type, idxStr] = doneKey.split('-')
-        const idx = parseInt(idxStr, 10)
-        const plan = today.modules.body.plans[idx]
+        const plan = today.modules.body.plans.find((p: any) => (p.id || p.type) === doneKey)
         return {
-          type: type as BodyPlanType,
-          duration: doneDurations[type] ?? 20,
+          type: (plan?.type || 'custom') as BodyPlanType,
+          duration: doneDurations[plan?.type ?? ''] ?? 20,
           customText: plan?.customText,
           timestamp: now,
         }
@@ -153,8 +150,8 @@ export default function BodyModal({ record, onComplete, onClose, updateData, ini
         ) : (
           <>
             <div className="flex flex-col gap-2">
-              {displayedPlans.map((plan, idx) => {
-                const doneKey = `${plan.type}-${idx}`
+              {displayedPlans.map(plan => {
+                const doneKey = plan.id || `${plan.type}-0`
                 return (
                   <div key={doneKey} className="bg-white rounded-xl px-4 py-3 border border-warm-gray">
                     <div className="flex items-center gap-2.5" onClick={() => toggleDone(doneKey)}>

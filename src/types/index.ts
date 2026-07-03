@@ -3,6 +3,7 @@ export type JobPlanType = 'collect' | 'submit' | 'resume' | 'portfolio' | 'custo
 export type JobDoneType = JobPlanType
 
 export interface JobPlan {
+  id: string
   type: JobPlanType
   customText?: string
   timestamp: string
@@ -20,6 +21,7 @@ export type InputPlanType = 'read' | 'study' | 'course' | 'case' | 'custom'
 export type InputDoneType = InputPlanType
 
 export interface InputPlan {
+  id: string
   type: InputPlanType
   customText?: string
   timestamp: string
@@ -38,6 +40,7 @@ export type BodyPlanType = 'walk' | 'bike' | 'exercise' | 'custom'
 export type BodyDoneType = BodyPlanType
 
 export interface BodyPlan {
+  id: string
   type: BodyPlanType
   customText?: string
   timestamp: string
@@ -55,6 +58,7 @@ export type TracePlanType = 'diary' | 'write' | 'chore' | 'custom'
 export type TraceDoneType = TracePlanType
 
 export interface TracePlan {
+  id: string
   type: TracePlanType
   customText?: string
   timestamp: string
