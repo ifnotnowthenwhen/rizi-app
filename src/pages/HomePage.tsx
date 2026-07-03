@@ -8,7 +8,8 @@ import FeedbackBanner from '../components/FeedbackBanner'
 import JobModal from '../components/JobModal'
 import InputModal from '../components/InputModal'
 import BodyModal from '../components/BodyModal'
-import type { ModuleType, DayRecord, AppData } from '../types'
+import TraceModal from '../components/TraceModal'
+import type { ModuleType } from '../types'
 
 const MODULES: { key: ModuleType; icon: string; label: string }[] = [
   { key: 'job', icon: '💼', label: '工作' },
@@ -94,7 +95,7 @@ export default function HomePage() {
         />
       )}
       {activeModal === 'trace' && (
-        <TraceModalContent
+        <TraceModal
           record={todayRecord}
           onComplete={() => handleModuleComplete('trace')}
           onClose={() => setActiveModal(null)}
@@ -105,28 +106,3 @@ export default function HomePage() {
   )
 }
 
-/* === Trace Modal (placeholder) === */
-function TraceModalContent({ onClose }: {
-  record: DayRecord; onComplete: () => void; onClose: () => void; updateData: (fn: (d: AppData) => void) => void
-}) {
-  return (
-    <ModalShell icon="✨" onClose={onClose}>
-      <p className="text-center text-xs text-deep-brown mt-2">痕迹模块（将在后续任务实现）</p>
-      <button onClick={onClose} className="mt-4 w-full py-2.5 rounded-xl text-sm text-white bg-sage">关闭</button>
-    </ModalShell>
-  )
-}
-
-/* === Modal Shell === */
-function ModalShell({ icon, children, onClose }: { icon: string; children: React.ReactNode; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30 animate-fade-in" onClick={onClose}>
-      <div className="bg-cream rounded-t-2xl sm:rounded-2xl w-full max-w-sm p-6 animate-slide-up" onClick={e => e.stopPropagation()}>
-        <div className="text-center mb-2">
-          <div className="text-3xl mb-1">{icon}</div>
-        </div>
-        {children}
-      </div>
-    </div>
-  )
-}
