@@ -1,5 +1,10 @@
 export function getTodayStr(): string {
   const d = new Date()
+  // Beijing timezone: day resets at 5PM (17:00)
+  // If before 5PM, we're still in yesterday's "day" (which started at 5PM yesterday)
+  if (d.getHours() < 17) {
+    d.setDate(d.getDate() - 1)
+  }
   return formatDate(d)
 }
 
