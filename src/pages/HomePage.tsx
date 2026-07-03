@@ -7,7 +7,8 @@ import ModuleCard from '../components/ModuleCard'
 import FeedbackBanner from '../components/FeedbackBanner'
 import JobModal from '../components/JobModal'
 import InputModal from '../components/InputModal'
-import type { ModuleType, DayRecord, AppData, JobPlanType } from '../types'
+import BodyModal from '../components/BodyModal'
+import type { ModuleType, DayRecord, AppData } from '../types'
 
 const MODULES: { key: ModuleType; icon: string; label: string }[] = [
   { key: 'job', icon: '💼', label: '工作' },
@@ -85,7 +86,7 @@ export default function HomePage() {
         />
       )}
       {activeModal === 'body' && (
-        <BodyModalContent
+        <BodyModal
           record={todayRecord}
           onComplete={() => handleModuleComplete('body')}
           onClose={() => setActiveModal(null)}
@@ -101,18 +102,6 @@ export default function HomePage() {
         />
       )}
     </div>
-  )
-}
-
-/* === Body Modal (placeholder) === */
-function BodyModalContent({ onClose }: {
-  record: DayRecord; onComplete: () => void; onClose: () => void; updateData: (fn: (d: AppData) => void) => void
-}) {
-  return (
-    <ModalShell icon="🧘" onClose={onClose}>
-      <p className="text-center text-xs text-deep-brown mt-2">身体模块（将在后续任务实现）</p>
-      <button onClick={onClose} className="mt-4 w-full py-2.5 rounded-xl text-sm text-white bg-sage">关闭</button>
-    </ModalShell>
   )
 }
 
