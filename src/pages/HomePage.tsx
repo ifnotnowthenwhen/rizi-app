@@ -29,7 +29,13 @@ export default function HomePage() {
   const todayRecord = useToday(data)
   const completedCount = useTodayCompletedCount(todayRecord)
   const [activeModal, setActiveModal] = useState<{ type: ModuleType; mode: 'plan' | 'done' } | null>(null)
+  const [modalKey, setModalKey] = useState(0)
   const [justCompleted, setJustCompleted] = useState<string | null>(null)
+
+  const openModal = (type: ModuleType, mode: 'plan' | 'done') => {
+    setModalKey(k => k + 1)
+    setActiveModal({ type, mode })
+  }
 
   const handleModuleComplete = (module: ModuleType) => {
     updateData(d => {
@@ -46,17 +52,15 @@ export default function HomePage() {
     updateData(d => {
       const record = d.records.find((r: any) => r.date === getTodayStr())
       if (!record) return
-      // Remove from plans (so user can re-plan later)
+      // Remove from plans
       record.modules[module].plans = (record.modules[module].plans as any[]).filter(
         (p: any) => p.type !== planType
       ) as any
       // Add to dones
-      record.modules[module].dones.push({
-        type: planType as any,
-        ...(plan?.customText ? { customText: plan.customText } : {}),
-        timestamp: new Date().toISOString(),
-      })
-      // Check if module should be completed
+      const now = new Date().toISOString()
+      const doneEntry: any = { type: planType, timestamp: now }
+      if (plan?.customText) doneEntry.customText = plan.customText
+      record.modules[module].dones.push(doneEntry)
       if (record.modules[module].dones.length > 0) {
         record.modules[module].completed = true
       }
@@ -120,14 +124,14 @@ export default function HomePage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setActiveModal({ type: m.key, mode: 'plan' })}
+                    onClick={() => openModal(m.key, 'plan')}
                     className="text-xs px-3.5 py-1.5 rounded-lg bg-cream text-caramel border border-warm-gray hover:bg-warm-gray transition-colors"
                   >
                     + 计划
                   </button>
                   {hasPlans && (
                     <button
-                      onClick={() => setActiveModal({ type: m.key, mode: 'done' })}
+                      onClick={() => openModal(m.key, 'done')}
                       className="text-xs px-3.5 py-1.5 rounded-lg bg-sage-light text-sage-dark border border-sage/30 hover:bg-sage hover:text-white transition-colors"
                     >
                       ✓ 完成
@@ -179,7 +183,7 @@ export default function HomePage() {
 
       {/* 弹窗 */}
       {activeModal?.mode === 'plan' && activeModal.type === 'job' && (
-        <JobModal
+        <JobModal key={modalKey}
           record={todayRecord}
           initialMode="plan"
           onComplete={() => handleModuleComplete('job')}
@@ -188,7 +192,7 @@ export default function HomePage() {
         />
       )}
       {activeModal?.mode === 'plan' && activeModal.type === 'input' && (
-        <InputModal
+        <InputModal key={modalKey}
           record={todayRecord}
           initialMode="plan"
           onComplete={() => handleModuleComplete('input')}
@@ -197,7 +201,7 @@ export default function HomePage() {
         />
       )}
       {activeModal?.mode === 'plan' && activeModal.type === 'body' && (
-        <BodyModal
+        <BodyModal key={modalKey}
           record={todayRecord}
           initialMode="plan"
           onComplete={() => handleModuleComplete('body')}
@@ -206,7 +210,7 @@ export default function HomePage() {
         />
       )}
       {activeModal?.mode === 'plan' && activeModal.type === 'trace' && (
-        <TraceModal
+        <TraceModal key={modalKey}
           record={todayRecord}
           initialMode="plan"
           onComplete={() => handleModuleComplete('trace')}
@@ -217,7 +221,7 @@ export default function HomePage() {
 
       {/* Done 弹窗 */}
       {activeModal?.mode === 'done' && activeModal.type === 'job' && (
-        <JobModal
+        <JobModal key={modalKey}
           record={todayRecord}
           initialMode="done"
           onComplete={() => handleModuleComplete('job')}
@@ -226,7 +230,7 @@ export default function HomePage() {
         />
       )}
       {activeModal?.mode === 'done' && activeModal.type === 'input' && (
-        <InputModal
+        <InputModal key={modalKey}
           record={todayRecord}
           initialMode="done"
           onComplete={() => handleModuleComplete('input')}
@@ -235,7 +239,7 @@ export default function HomePage() {
         />
       )}
       {activeModal?.mode === 'done' && activeModal.type === 'body' && (
-        <BodyModal
+        <BodyModal key={modalKey}
           record={todayRecord}
           initialMode="done"
           onComplete={() => handleModuleComplete('body')}
@@ -244,7 +248,7 @@ export default function HomePage() {
         />
       )}
       {activeModal?.mode === 'done' && activeModal.type === 'trace' && (
-        <TraceModal
+        <TraceModal key={modalKey}
           record={todayRecord}
           initialMode="done"
           onComplete={() => handleModuleComplete('trace')}

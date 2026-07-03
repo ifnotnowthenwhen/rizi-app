@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { DayRecord, JobPlanType, JobPlan } from '../types'
+import type { DayRecord, JobPlanType } from '../types'
 import { getTodayStr } from '../utils/date'
 import EditableTag from './EditableTag'
 
@@ -30,15 +30,18 @@ export default function JobModal({ record, onComplete, onClose, updateData, init
   const [selectedPlans, setSelectedPlans] = useState<JobPlanType[]>(
     record.modules.job.plans.map(p => p.type)
   )
-  const [customText, setCustomText] = useState('')
-  const [showCustom, setShowCustom] = useState(false)
+  const [customEntries, setCustomEntries] = useState<{id: string; text: string}[]>([])
   const [doneCounts, setDoneCounts] = useState<Record<string, number>>(
     Object.fromEntries(
       record.modules.job.dones.map(d => [d.type, d.count ?? DEFAULT_COUNTS[d.type] ?? 0])
     )
   )
   const [doneSet, setDoneSet] = useState<Set<string>>(
-    new Set(record.modules.job.dones.map(d => d.type))
+    new Set(
+      record.modules.job.plans
+        .map((p, idx) => record.modules.job.dones.some(d => d.type === p.type) ? `${p.type}-${idx}` : null)
+        .filter(Boolean) as string[]
+    )
   )
 
   const handlePlan = () => {
@@ -46,11 +49,10 @@ export default function JobModal({ record, onComplete, onClose, updateData, init
       const today = d.records.find((r: DayRecord) => r.date === getTodayStr())
       if (!today) return
       const now = new Date().toISOString()
-      today.modules.job.plans = selectedPlans.map(type => ({
-        type,
-        customText: type === 'custom' ? customText : undefined,
-        timestamp: now,
-      }))
+      today.modules.job.plans = [
+        ...selectedPlans.map(type => ({ type, timestamp: now })),
+        ...customEntries.map(ce => ({ type: 'custom' as JobPlanType, customText: ce.text || undefined, timestamp: now })),
+      ]
     })
     onClose()
   }
@@ -60,8 +62,10 @@ export default function JobModal({ record, onComplete, onClose, updateData, init
       const today = d.records.find((r: DayRecord) => r.date === getTodayStr())
       if (!today) return
       const now = new Date().toISOString()
-      today.modules.job.dones = Array.from(doneSet).map(type => {
-        const plan = today.modules.job.plans.find((p: JobPlan) => p.type === type)
+      today.modules.job.dones = Array.from(doneSet).map(doneKey => {
+        const [type, idxStr] = doneKey.split('-')
+        const idx = parseInt(idxStr, 10)
+        const plan = today.modules.job.plans[idx]
         return {
           type: type as JobPlanType,
           count: doneCounts[type] ?? DEFAULT_COUNTS[type],
@@ -83,11 +87,11 @@ export default function JobModal({ record, onComplete, onClose, updateData, init
     )
   }
 
-  const toggleDone = (type: string) => {
+  const toggleDone = (doneKey: string) => {
     setDoneSet(prev => {
       const next = new Set(prev)
-      if (next.has(type)) next.delete(type)
-      else next.add(type)
+      if (next.has(doneKey)) next.delete(doneKey)
+      else next.add(doneKey)
       return next
     })
   }
@@ -95,6 +99,14 @@ export default function JobModal({ record, onComplete, onClose, updateData, init
   const updateCount = (type: string, val: number) => {
     setDoneCounts(prev => ({ ...prev, [type]: val }))
   }
+
+  const displayLabel = (plan: any) => {
+    if (plan.type === 'custom') return plan.customText || '干点别的'
+    const opt = PLAN_OPTIONS.find(o => o.type === plan.type)
+    return opt ? `${opt.icon} ${opt.label}` : plan.type
+  }
+
+  const displayedPlans = record.modules.job.plans.length > 0 ? record.modules.job.plans : []
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30 animate-fade-in" onClick={onClose}>
@@ -135,28 +147,40 @@ export default function JobModal({ record, onComplete, onClose, updateData, init
                   <span>{opt.icon} {opt.label}</span>
                 </div>
               ))}
-              {showCustom ? (
-                <div className="bg-white rounded-xl px-4 py-3 border border-dashed border-light-brown">
+              {/* Custom entries */}
+              {customEntries.map(entry => (
+                <div key={entry.id} className="flex items-center gap-2 bg-white rounded-xl px-4 py-3 border border-dashed border-sage">
+                  <span className="text-light-brown text-xs">✏️</span>
                   <input
                     autoFocus
-                    value={customText}
-                    onChange={e => setCustomText(e.target.value)}
+                    value={entry.text}
+                    onChange={e => setCustomEntries(prev =>
+                      prev.map(ce => ce.id === entry.id ? { ...ce, text: e.target.value } : ce)
+                    )}
                     placeholder="写点什么..."
-                    className="w-full text-sm text-caramel bg-transparent outline-none"
+                    className="flex-1 text-sm text-caramel bg-transparent outline-none"
                   />
+                  <button
+                    onClick={() => setCustomEntries(prev => prev.filter(ce => ce.id !== entry.id))}
+                    className="text-light-brown hover:text-deep-brown text-xs"
+                  >
+                    ✕
+                  </button>
                 </div>
-              ) : (
-                <div
-                  onClick={() => { setShowCustom(true); setSelectedPlans(prev => [...prev, 'custom']) }}
-                  className="bg-warm-gray rounded-xl px-4 py-3 text-sm text-deep-brown text-center border border-dashed border-light-brown cursor-pointer"
-                >
-                  + 干点别的
-                </div>
-              )}
+              ))}
+              <div
+                onClick={() => {
+                  const id = `_c_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+                  setCustomEntries(prev => [...prev, { id, text: '' }])
+                }}
+                className="bg-warm-gray rounded-xl px-4 py-3 text-sm text-deep-brown text-center border border-dashed border-light-brown cursor-pointer hover:bg-cream transition-colors"
+              >
+                + 干点别的
+              </div>
             </div>
             <button
               onClick={handlePlan}
-              disabled={selectedPlans.length === 0}
+              disabled={selectedPlans.length === 0 && customEntries.length === 0}
               className="mt-4 w-full py-2.5 rounded-xl text-sm text-white bg-sage disabled:opacity-40 transition-opacity"
             >
               ✓ 定下计划
@@ -165,18 +189,19 @@ export default function JobModal({ record, onComplete, onClose, updateData, init
         ) : (
           <>
             <div className="flex flex-col gap-2">
-              {(record.modules.job.plans.length > 0 ? record.modules.job.plans : []).map(plan => {
+              {displayedPlans.map((plan, idx) => {
+                const doneKey = `${plan.type}-${idx}`
                 const opt = PLAN_OPTIONS.find(o => o.type === plan.type)
                 return (
-                  <div key={plan.type} className="bg-white rounded-xl px-4 py-3 border border-warm-gray">
-                    <div className="flex items-center gap-2.5" onClick={() => toggleDone(plan.type)}>
+                  <div key={doneKey} className="bg-white rounded-xl px-4 py-3 border border-warm-gray">
+                    <div className="flex items-center gap-2.5" onClick={() => toggleDone(doneKey)}>
                       <span className={`w-4.5 h-4.5 rounded border-2 flex items-center justify-center text-xs cursor-pointer transition-all ${
-                        doneSet.has(plan.type) ? 'bg-sage border-sage text-white' : 'border-light-brown'
+                        doneSet.has(doneKey) ? 'bg-sage border-sage text-white' : 'border-light-brown'
                       }`}>
-                        {doneSet.has(plan.type) ? '✓' : ''}
+                        {doneSet.has(doneKey) ? '✓' : ''}
                       </span>
-                      <span className={`text-sm ${doneSet.has(plan.type) ? 'text-deep-brown line-through' : 'text-caramel'}`}>
-                        {opt?.icon} {plan.type === 'custom' ? (plan.customText || '干点别的') : opt?.label.replace(/\d+/, '')}
+                      <span className={`text-sm ${doneSet.has(doneKey) ? 'text-deep-brown line-through' : 'text-caramel'}`}>
+                        {displayLabel(plan)}
                       </span>
                       {opt?.hasCount && (
                         <span className="ml-auto">
@@ -184,7 +209,7 @@ export default function JobModal({ record, onComplete, onClose, updateData, init
                             value={doneCounts[plan.type] ?? DEFAULT_COUNTS[plan.type] ?? 0}
                             suffix={opt.countLabel}
                             onChange={val => updateCount(plan.type, val)}
-                            done={doneSet.has(plan.type)}
+                            done={doneSet.has(doneKey)}
                           />
                         </span>
                       )}

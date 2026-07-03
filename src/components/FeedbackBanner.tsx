@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 
 const DEFAULT_TEXT = '生活流动在当下。'
 
@@ -15,13 +15,12 @@ interface Props {
 
 export default function FeedbackBanner({ justCompleted }: Props) {
   const [toast, setToast] = useState<string | null>(null)
-  const timerRef = useRef<ReturnType<typeof setTimeout>>()
 
   useEffect(() => {
     if (justCompleted && MODULE_FEEDBACK[justCompleted]) {
       setToast(MODULE_FEEDBACK[justCompleted])
-      clearTimeout(timerRef.current)
-      timerRef.current = setTimeout(() => setToast(null), 2200)
+      const timer = setTimeout(() => setToast(null), 2200)
+      return () => clearTimeout(timer)
     }
   }, [justCompleted])
 
@@ -34,15 +33,13 @@ export default function FeedbackBanner({ justCompleted }: Props) {
         </p>
       </div>
 
-      {/* 居中弹窗 Toast */}
+      {/* 居中弹窗 Toast — 文字直接浮现在虚化背景上 */}
       {toast && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center pointer-events-none">
           <div className="absolute inset-0 bg-black/10 backdrop-blur-sm animate-fade-in" />
-          <div className="relative bg-white/95 rounded-2xl px-10 py-6 shadow-xl animate-slide-up max-w-xs text-center">
-            <p className="text-base text-caramel italic leading-relaxed whitespace-nowrap">
-              &ldquo;{toast}&rdquo;
-            </p>
-          </div>
+          <p className="relative text-lg text-caramel italic leading-relaxed whitespace-nowrap animate-slide-up drop-shadow-sm">
+            &ldquo;{toast}&rdquo;
+          </p>
         </div>
       )}
     </>

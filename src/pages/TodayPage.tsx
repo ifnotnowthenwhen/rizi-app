@@ -92,7 +92,7 @@ export default function TodayPage() {
   return (
     <div className="py-6">
       <div className="text-center mb-6">
-        <h2 className="text-base font-medium text-caramel">一日回顾</h2>
+        <h2 className="text-lg font-medium text-caramel">一日回顾</h2>
       </div>
 
       {/* 已完成 */}

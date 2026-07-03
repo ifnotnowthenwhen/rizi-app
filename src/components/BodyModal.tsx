@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { DayRecord, BodyPlanType, BodyPlan } from '../types'
+import type { DayRecord, BodyPlanType } from '../types'
 import { getTodayStr } from '../utils/date'
 import EditableTag from './EditableTag'
 
@@ -23,13 +23,16 @@ export default function BodyModal({ record, onComplete, onClose, updateData, ini
   const [selectedPlans, setSelectedPlans] = useState<BodyPlanType[]>(
     record.modules.body.plans.map(p => p.type)
   )
-  const [customText, setCustomText] = useState('')
-  const [showCustom, setShowCustom] = useState(false)
+  const [customEntries, setCustomEntries] = useState<{id: string; text: string}[]>([])
   const [doneDurations, setDoneDurations] = useState<Record<string, number>>(
     Object.fromEntries(record.modules.body.dones.map(d => [d.type, d.duration ?? 20]))
   )
   const [doneSet, setDoneSet] = useState<Set<string>>(
-    new Set(record.modules.body.dones.map(d => d.type))
+    new Set(
+      record.modules.body.plans
+        .map((p, idx) => record.modules.body.dones.some(d => d.type === p.type) ? `${p.type}-${idx}` : null)
+        .filter(Boolean) as string[]
+    )
   )
 
   const togglePlan = (type: BodyPlanType) => {
@@ -40,20 +43,20 @@ export default function BodyModal({ record, onComplete, onClose, updateData, ini
     updateData((d: any) => {
       const today = d.records.find((r: DayRecord) => r.date === getTodayStr())
       if (!today) return
-      today.modules.body.plans = selectedPlans.map(type => ({
-        type,
-        customText: type === 'custom' ? customText : undefined,
-        timestamp: new Date().toISOString(),
-      }))
+      const now = new Date().toISOString()
+      today.modules.body.plans = [
+        ...selectedPlans.map(type => ({ type, timestamp: now })),
+        ...customEntries.map(ce => ({ type: 'custom' as BodyPlanType, customText: ce.text || undefined, timestamp: now })),
+      ]
     })
     onClose()
   }
 
-  const toggleDone = (type: string) => {
+  const toggleDone = (doneKey: string) => {
     setDoneSet(prev => {
       const next = new Set(prev)
-      if (next.has(type)) next.delete(type)
-      else next.add(type)
+      if (next.has(doneKey)) next.delete(doneKey)
+      else next.add(doneKey)
       return next
     })
   }
@@ -62,19 +65,28 @@ export default function BodyModal({ record, onComplete, onClose, updateData, ini
     updateData((d: any) => {
       const today = d.records.find((r: DayRecord) => r.date === getTodayStr())
       if (!today) return
-      today.modules.body.dones = Array.from(doneSet).map(type => {
-        const plan = today.modules.body.plans.find((p: BodyPlan) => p.type === type)
+      const now = new Date().toISOString()
+      today.modules.body.dones = Array.from(doneSet).map(doneKey => {
+        const [type, idxStr] = doneKey.split('-')
+        const idx = parseInt(idxStr, 10)
+        const plan = today.modules.body.plans[idx]
         return {
           type: type as BodyPlanType,
           duration: doneDurations[type] ?? 20,
           customText: plan?.customText,
-          timestamp: new Date().toISOString(),
+          timestamp: now,
         }
       })
       if (doneSet.size > 0) today.modules.body.completed = true
     })
     if (doneSet.size > 0) onComplete()
     onClose()
+  }
+
+  const displayLabel = (plan: any) => {
+    if (plan.type === 'custom') return plan.customText || '干点别的'
+    const opt = PLAN_OPTIONS.find(o => o.type === plan.type)
+    return opt ? `${opt.icon} ${opt.label}` : plan.type
   }
 
   const displayedPlans = hasPlans ? record.modules.body.plans : []
@@ -104,39 +116,63 @@ export default function BodyModal({ record, onComplete, onClose, updateData, ini
                   <span className="text-caramel">{opt.icon} {opt.label}</span>
                 </div>
               ))}
-              {showCustom ? (
-                <div className="bg-white rounded-xl px-4 py-3 border border-dashed border-light-brown">
-                  <input autoFocus value={customText} onChange={e => setCustomText(e.target.value)}
-                    placeholder="做什么运动？" className="w-full text-sm text-caramel bg-transparent outline-none" />
+              {/* Custom entries */}
+              {customEntries.map(entry => (
+                <div key={entry.id} className="flex items-center gap-2 bg-white rounded-xl px-4 py-3 border border-dashed border-sage">
+                  <span className="text-light-brown text-xs">✏️</span>
+                  <input
+                    autoFocus
+                    value={entry.text}
+                    onChange={e => setCustomEntries(prev =>
+                      prev.map(ce => ce.id === entry.id ? { ...ce, text: e.target.value } : ce)
+                    )}
+                    placeholder="写点什么..."
+                    className="flex-1 text-sm text-caramel bg-transparent outline-none"
+                  />
+                  <button
+                    onClick={() => setCustomEntries(prev => prev.filter(ce => ce.id !== entry.id))}
+                    className="text-light-brown hover:text-deep-brown text-xs"
+                  >
+                    ✕
+                  </button>
                 </div>
-              ) : (
-                <div onClick={() => { setShowCustom(true); setSelectedPlans(prev => [...prev, 'custom']) }}
-                  className="bg-warm-gray rounded-xl px-4 py-3 text-sm text-deep-brown text-center border border-dashed border-light-brown cursor-pointer">+ 干点别的</div>
-              )}
+              ))}
+              <div
+                onClick={() => {
+                  const id = `_c_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+                  setCustomEntries(prev => [...prev, { id, text: '' }])
+                }}
+                className="bg-warm-gray rounded-xl px-4 py-3 text-sm text-deep-brown text-center border border-dashed border-light-brown cursor-pointer hover:bg-cream transition-colors"
+              >
+                + 干点别的
+              </div>
             </div>
-            <button onClick={handlePlan} disabled={selectedPlans.length === 0}
+            <button onClick={handlePlan} disabled={selectedPlans.length === 0 && customEntries.length === 0}
               className="mt-4 w-full py-2.5 rounded-xl text-sm text-white bg-sage disabled:opacity-40">✓ 定下计划</button>
           </>
         ) : (
           <>
             <div className="flex flex-col gap-2">
-              {displayedPlans.map(plan => (
-                <div key={plan.type} className="bg-white rounded-xl px-4 py-3 border border-warm-gray">
-                  <div className="flex items-center gap-2.5" onClick={() => toggleDone(plan.type)}>
-                    <span className={`w-4.5 h-4.5 rounded border-2 flex items-center justify-center text-xs cursor-pointer transition-all ${
-                      doneSet.has(plan.type) ? 'bg-sage border-sage text-white' : 'border-light-brown'
-                    }`}>{doneSet.has(plan.type) ? '✓' : ''}</span>
-                    <span className={`text-sm ${doneSet.has(plan.type) ? 'text-deep-brown line-through' : 'text-caramel'}`}>
-                      {PLAN_OPTIONS.find(o => o.type === plan.type)?.icon} {plan.type === 'custom' ? (plan.customText || '干点别的') : PLAN_OPTIONS.find(o => o.type === plan.type)?.label}
-                    </span>
-                    <span className="ml-auto">
-                      <EditableTag value={doneDurations[plan.type] ?? 20} suffix="分钟"
-                        onChange={val => setDoneDurations(prev => ({ ...prev, [plan.type]: val }))}
-                        done={doneSet.has(plan.type)} />
-                    </span>
+              {displayedPlans.map((plan, idx) => {
+                const doneKey = `${plan.type}-${idx}`
+                return (
+                  <div key={doneKey} className="bg-white rounded-xl px-4 py-3 border border-warm-gray">
+                    <div className="flex items-center gap-2.5" onClick={() => toggleDone(doneKey)}>
+                      <span className={`w-4.5 h-4.5 rounded border-2 flex items-center justify-center text-xs cursor-pointer transition-all ${
+                        doneSet.has(doneKey) ? 'bg-sage border-sage text-white' : 'border-light-brown'
+                      }`}>{doneSet.has(doneKey) ? '✓' : ''}</span>
+                      <span className={`text-sm ${doneSet.has(doneKey) ? 'text-deep-brown line-through' : 'text-caramel'}`}>
+                        {displayLabel(plan)}
+                      </span>
+                      <span className="ml-auto">
+                        <EditableTag value={doneDurations[plan.type] ?? 20} suffix="分钟"
+                          onChange={val => setDoneDurations(prev => ({ ...prev, [plan.type]: val }))}
+                          done={doneSet.has(doneKey)} />
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
             <button onClick={handleDone}
               className="mt-4 w-full py-2.5 rounded-xl text-sm text-white bg-light-brown hover:opacity-90">✓ 更新完成</button>

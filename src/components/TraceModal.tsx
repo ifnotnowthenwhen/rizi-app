@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { DayRecord, TracePlanType, TracePlan } from '../types'
+import type { DayRecord, TracePlanType } from '../types'
 import { getTodayStr } from '../utils/date'
 
 interface Props {
@@ -22,13 +22,16 @@ export default function TraceModal({ record, onComplete, onClose, updateData, in
   const [selectedPlans, setSelectedPlans] = useState<TracePlanType[]>(
     record.modules.trace.plans.map(p => p.type)
   )
-  const [customText, setCustomText] = useState('')
-  const [showCustom, setShowCustom] = useState(false)
+  const [customEntries, setCustomEntries] = useState<{id: string; text: string}[]>([])
   const [doneDescriptions, setDoneDescriptions] = useState<Record<string, string>>(
     Object.fromEntries(record.modules.trace.dones.map(d => [d.type, d.description ?? '']))
   )
   const [doneSet, setDoneSet] = useState<Set<string>>(
-    new Set(record.modules.trace.dones.map(d => d.type))
+    new Set(
+      record.modules.trace.plans
+        .map((p, idx) => record.modules.trace.dones.some(d => d.type === p.type) ? `${p.type}-${idx}` : null)
+        .filter(Boolean) as string[]
+    )
   )
 
   const togglePlan = (type: TracePlanType) => {
@@ -39,20 +42,20 @@ export default function TraceModal({ record, onComplete, onClose, updateData, in
     updateData((d: any) => {
       const today = d.records.find((r: DayRecord) => r.date === getTodayStr())
       if (!today) return
-      today.modules.trace.plans = selectedPlans.map(type => ({
-        type,
-        customText: type === 'custom' ? customText : undefined,
-        timestamp: new Date().toISOString(),
-      }))
+      const now = new Date().toISOString()
+      today.modules.trace.plans = [
+        ...selectedPlans.map(type => ({ type, timestamp: now })),
+        ...customEntries.map(ce => ({ type: 'custom' as TracePlanType, customText: ce.text || undefined, timestamp: now })),
+      ]
     })
     onClose()
   }
 
-  const toggleDone = (type: string) => {
+  const toggleDone = (doneKey: string) => {
     setDoneSet(prev => {
       const next = new Set(prev)
-      if (next.has(type)) next.delete(type)
-      else next.add(type)
+      if (next.has(doneKey)) next.delete(doneKey)
+      else next.add(doneKey)
       return next
     })
   }
@@ -61,19 +64,28 @@ export default function TraceModal({ record, onComplete, onClose, updateData, in
     updateData((d: any) => {
       const today = d.records.find((r: DayRecord) => r.date === getTodayStr())
       if (!today) return
-      today.modules.trace.dones = Array.from(doneSet).map(type => {
-        const plan = today.modules.trace.plans.find((p: TracePlan) => p.type === type)
+      const now = new Date().toISOString()
+      today.modules.trace.dones = Array.from(doneSet).map(doneKey => {
+        const [type, idxStr] = doneKey.split('-')
+        const idx = parseInt(idxStr, 10)
+        const plan = today.modules.trace.plans[idx]
         return {
           type: type as TracePlanType,
           description: doneDescriptions[type] || undefined,
           customText: plan?.customText,
-          timestamp: new Date().toISOString(),
+          timestamp: now,
         }
       })
       if (doneSet.size > 0) today.modules.trace.completed = true
     })
     if (doneSet.size > 0) onComplete()
     onClose()
+  }
+
+  const displayLabel = (plan: any) => {
+    if (plan.type === 'custom') return plan.customText || '干点别的'
+    const opt = PLAN_OPTIONS.find(o => o.type === plan.type)
+    return opt ? `${opt.icon} ${opt.label}` : plan.type
   }
 
   const displayedPlans = hasPlans ? record.modules.trace.plans : []
@@ -103,40 +115,64 @@ export default function TraceModal({ record, onComplete, onClose, updateData, in
                   <span className="text-caramel">{opt.icon} {opt.label}</span>
                 </div>
               ))}
-              {showCustom ? (
-                <div className="bg-white rounded-xl px-4 py-3 border border-dashed border-light-brown">
-                  <input autoFocus value={customText} onChange={e => setCustomText(e.target.value)}
-                    placeholder="做了什么？" className="w-full text-sm text-caramel bg-transparent outline-none" />
+              {/* Custom entries */}
+              {customEntries.map(entry => (
+                <div key={entry.id} className="flex items-center gap-2 bg-white rounded-xl px-4 py-3 border border-dashed border-sage">
+                  <span className="text-light-brown text-xs">✏️</span>
+                  <input
+                    autoFocus
+                    value={entry.text}
+                    onChange={e => setCustomEntries(prev =>
+                      prev.map(ce => ce.id === entry.id ? { ...ce, text: e.target.value } : ce)
+                    )}
+                    placeholder="写点什么..."
+                    className="flex-1 text-sm text-caramel bg-transparent outline-none"
+                  />
+                  <button
+                    onClick={() => setCustomEntries(prev => prev.filter(ce => ce.id !== entry.id))}
+                    className="text-light-brown hover:text-deep-brown text-xs"
+                  >
+                    ✕
+                  </button>
                 </div>
-              ) : (
-                <div onClick={() => { setShowCustom(true); setSelectedPlans(prev => [...prev, 'custom']) }}
-                  className="bg-warm-gray rounded-xl px-4 py-3 text-sm text-deep-brown text-center border border-dashed border-light-brown cursor-pointer">+ 干点别的</div>
-              )}
+              ))}
+              <div
+                onClick={() => {
+                  const id = `_c_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+                  setCustomEntries(prev => [...prev, { id, text: '' }])
+                }}
+                className="bg-warm-gray rounded-xl px-4 py-3 text-sm text-deep-brown text-center border border-dashed border-light-brown cursor-pointer hover:bg-cream transition-colors"
+              >
+                + 干点别的
+              </div>
             </div>
-            <button onClick={handlePlan} disabled={selectedPlans.length === 0}
+            <button onClick={handlePlan} disabled={selectedPlans.length === 0 && customEntries.length === 0}
               className="mt-4 w-full py-2.5 rounded-xl text-sm text-white bg-sage disabled:opacity-40">✓ 定下计划</button>
           </>
         ) : (
           <>
             <div className="flex flex-col gap-3">
-              {displayedPlans.map(plan => (
-                <div key={plan.type} className="bg-white rounded-xl px-4 py-3 border border-warm-gray">
-                  <div className="flex items-center gap-2.5" onClick={() => toggleDone(plan.type)}>
-                    <span className={`w-4.5 h-4.5 rounded border-2 flex items-center justify-center text-xs cursor-pointer transition-all ${
-                      doneSet.has(plan.type) ? 'bg-sage border-sage text-white' : 'border-light-brown'
-                    }`}>{doneSet.has(plan.type) ? '✓' : ''}</span>
-                    <span className={`text-sm ${doneSet.has(plan.type) ? 'text-deep-brown line-through' : 'text-caramel'}`}>
-                      {PLAN_OPTIONS.find(o => o.type === plan.type)?.icon} {plan.type === 'custom' ? (plan.customText || '干点别的') : PLAN_OPTIONS.find(o => o.type === plan.type)?.label}
-                    </span>
+              {displayedPlans.map((plan, idx) => {
+                const doneKey = `${plan.type}-${idx}`
+                return (
+                  <div key={doneKey} className="bg-white rounded-xl px-4 py-3 border border-warm-gray">
+                    <div className="flex items-center gap-2.5" onClick={() => toggleDone(doneKey)}>
+                      <span className={`w-4.5 h-4.5 rounded border-2 flex items-center justify-center text-xs cursor-pointer transition-all ${
+                        doneSet.has(doneKey) ? 'bg-sage border-sage text-white' : 'border-light-brown'
+                      }`}>{doneSet.has(doneKey) ? '✓' : ''}</span>
+                      <span className={`text-sm ${doneSet.has(doneKey) ? 'text-deep-brown line-through' : 'text-caramel'}`}>
+                        {displayLabel(plan)}
+                      </span>
+                    </div>
+                    <div className="mt-2 ml-7">
+                      <input value={doneDescriptions[plan.type] ?? ''}
+                        onChange={e => setDoneDescriptions(prev => ({ ...prev, [plan.type]: e.target.value }))}
+                        placeholder={plan.type === 'diary' ? '今天的感受？' : plan.type === 'write' ? '写了什么？' : plan.type === 'chore' ? '做了什么家务？' : '具体做了什么？'}
+                        className="w-full text-xs text-deep-brown bg-cream rounded-md px-3 py-1.5 outline-none placeholder:text-light-brown" />
+                    </div>
                   </div>
-                  <div className="mt-2 ml-7">
-                    <input value={doneDescriptions[plan.type] ?? ''}
-                      onChange={e => setDoneDescriptions(prev => ({ ...prev, [plan.type]: e.target.value }))}
-                      placeholder={plan.type === 'diary' ? '今天的感受？' : plan.type === 'write' ? '写了什么？' : plan.type === 'chore' ? '做了什么家务？' : '具体做了什么？'}
-                      className="w-full text-xs text-deep-brown bg-cream rounded-md px-3 py-1.5 outline-none placeholder:text-light-brown" />
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
             <button onClick={handleDone}
               className="mt-4 w-full py-2.5 rounded-xl text-sm text-white bg-light-brown hover:opacity-90">✓ 更新完成</button>
