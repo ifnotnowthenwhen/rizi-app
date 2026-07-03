@@ -38,8 +38,8 @@ export default function FeedbackBanner({ justCompleted }: Props) {
       {toast && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center pointer-events-none">
           <div className="absolute inset-0 bg-black/10 backdrop-blur-sm animate-fade-in" />
-          <div className="relative bg-white/95 rounded-2xl px-8 py-6 shadow-xl animate-slide-up max-w-xs text-center">
-            <p className="text-base text-caramel italic leading-relaxed">
+          <div className="relative bg-white/95 rounded-2xl px-10 py-6 shadow-xl animate-slide-up max-w-xs text-center">
+            <p className="text-base text-caramel italic leading-relaxed whitespace-nowrap">
               &ldquo;{toast}&rdquo;
             </p>
           </div>

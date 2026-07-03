@@ -46,6 +46,10 @@ export default function HomePage() {
     updateData(d => {
       const record = d.records.find((r: any) => r.date === getTodayStr())
       if (!record) return
+      // Remove from plans (so user can re-plan later)
+      record.modules[module].plans = (record.modules[module].plans as any[]).filter(
+        (p: any) => p.type !== planType
+      ) as any
       // Add to dones
       record.modules[module].dones.push({
         type: planType as any,
@@ -114,12 +118,22 @@ export default function HomePage() {
                     )}
                   </div>
                 </div>
-                <button
-                  onClick={() => setActiveModal({ type: m.key, mode: 'plan' })}
-                  className="text-xs px-3.5 py-1.5 rounded-lg bg-cream text-caramel border border-warm-gray hover:bg-warm-gray transition-colors"
-                >
-                  + 计划
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setActiveModal({ type: m.key, mode: 'plan' })}
+                    className="text-xs px-3.5 py-1.5 rounded-lg bg-cream text-caramel border border-warm-gray hover:bg-warm-gray transition-colors"
+                  >
+                    + 计划
+                  </button>
+                  {hasPlans && (
+                    <button
+                      onClick={() => setActiveModal({ type: m.key, mode: 'done' })}
+                      className="text-xs px-3.5 py-1.5 rounded-lg bg-sage-light text-sage-dark border border-sage/30 hover:bg-sage hover:text-white transition-colors"
+                    >
+                      ✓ 完成
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* 计划列表 */}
@@ -195,6 +209,44 @@ export default function HomePage() {
         <TraceModal
           record={todayRecord}
           initialMode="plan"
+          onComplete={() => handleModuleComplete('trace')}
+          onClose={() => setActiveModal(null)}
+          updateData={updateData}
+        />
+      )}
+
+      {/* Done 弹窗 */}
+      {activeModal?.mode === 'done' && activeModal.type === 'job' && (
+        <JobModal
+          record={todayRecord}
+          initialMode="done"
+          onComplete={() => handleModuleComplete('job')}
+          onClose={() => setActiveModal(null)}
+          updateData={updateData}
+        />
+      )}
+      {activeModal?.mode === 'done' && activeModal.type === 'input' && (
+        <InputModal
+          record={todayRecord}
+          initialMode="done"
+          onComplete={() => handleModuleComplete('input')}
+          onClose={() => setActiveModal(null)}
+          updateData={updateData}
+        />
+      )}
+      {activeModal?.mode === 'done' && activeModal.type === 'body' && (
+        <BodyModal
+          record={todayRecord}
+          initialMode="done"
+          onComplete={() => handleModuleComplete('body')}
+          onClose={() => setActiveModal(null)}
+          updateData={updateData}
+        />
+      )}
+      {activeModal?.mode === 'done' && activeModal.type === 'trace' && (
+        <TraceModal
+          record={todayRecord}
+          initialMode="done"
           onComplete={() => handleModuleComplete('trace')}
           onClose={() => setActiveModal(null)}
           updateData={updateData}

@@ -1,6 +1,5 @@
 import { useAppData } from '../hooks/useLocalStorage'
 import { useToday, useTodayCompletedCount } from '../hooks/useToday'
-import { getTodayStr, getDisplayDate } from '../utils/date'
 import type { ModuleType } from '../types'
 
 const MODULE_INFO: Record<ModuleType, { icon: string; label: string; options: { type: string; icon: string; label: string }[] }> = {
@@ -93,7 +92,7 @@ export default function TodayPage() {
   return (
     <div className="py-6">
       <div className="text-center mb-6">
-        <h2 className="text-base font-medium text-caramel">{getDisplayDate(getTodayStr())}</h2>
+        <h2 className="text-base font-medium text-caramel">一日回顾</h2>
       </div>
 
       {/* 已完成 */}
