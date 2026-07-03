@@ -5,6 +5,7 @@ import { useToday, useTodayCompletedCount } from '../hooks/useToday'
 import ProgressBar from '../components/ProgressBar'
 import ModuleCard from '../components/ModuleCard'
 import FeedbackBanner from '../components/FeedbackBanner'
+import JobModal from '../components/JobModal'
 import type { ModuleType, DayRecord, AppData, JobPlanType } from '../types'
 
 const MODULES: { key: ModuleType; icon: string; label: string }[] = [
@@ -67,7 +68,7 @@ export default function HomePage() {
 
       {/* 弹窗区域 - modal components rendered inline */}
       {activeModal === 'job' && (
-        <JobModalContent
+        <JobModal
           record={todayRecord}
           onComplete={() => handleModuleComplete('job')}
           onClose={() => setActiveModal(null)}
@@ -99,104 +100,6 @@ export default function HomePage() {
         />
       )}
     </div>
-  )
-}
-
-/* === Work Modal (placeholder, will be replaced by JobModal.tsx) === */
-function JobModalContent({ record, onComplete, onClose, updateData }: {
-  record: DayRecord; onComplete: () => void; onClose: () => void; updateData: (fn: (d: AppData) => void) => void
-}) {
-  const [showPlan, setShowPlan] = useState(true)
-  const [selected, setSelected] = useState<JobPlanType[]>([])
-  const [doneSet, setDoneSet] = useState<Set<string>>(new Set())
-  const [doneCounts, setDoneCounts] = useState<Record<string, number>>({})
-
-  const PLAN_OPTIONS = [
-    { type: 'collect' as JobPlanType, label: '收藏 5 个岗位', icon: '📌' },
-    { type: 'submit' as JobPlanType, label: '投递 5 份简历', icon: '📬' },
-    { type: 'resume' as JobPlanType, label: '修改简历', icon: '📝' },
-    { type: 'portfolio' as JobPlanType, label: '修改作品集', icon: '🎨' },
-  ]
-
-  const hasPlans = record.modules.job.plans.length > 0
-
-  if (!hasPlans && showPlan) return (
-    <ModalShell icon="💼" onClose={onClose}>
-      <div className="text-center mb-4">
-        <h3 className="text-base text-caramel font-medium">Plan</h3>
-        <p className="text-xs text-deep-brown mt-0.5">今天计划做什么？</p>
-      </div>
-      <div className="flex flex-col gap-2">
-        {PLAN_OPTIONS.map(opt => (
-          <div key={opt.type} onClick={() => setSelected(prev =>
-            prev.includes(opt.type) ? prev.filter(t => t !== opt.type) : [...prev, opt.type]
-          )}
-            className={`flex items-center gap-2.5 bg-white rounded-xl px-4 py-3 text-sm cursor-pointer transition-all ${
-              selected.includes(opt.type) ? 'border-2 border-sage' : 'border border-warm-gray'
-            }`}>
-            <span className={`w-4.5 h-4.5 rounded border-2 flex items-center justify-center text-xs transition-all ${
-              selected.includes(opt.type) ? 'bg-sage border-sage text-white' : 'border-light-brown'
-            }`}>{selected.includes(opt.type) ? '✓' : ''}</span>
-            <span className="text-caramel">{opt.icon} {opt.label}</span>
-          </div>
-        ))}
-      </div>
-      <button onClick={() => {
-        updateData(d => {
-          const today = d.records.find(r => r.date === getTodayStr())
-          if (!today) return
-          today.modules.job.plans = selected.map(type => ({ type, timestamp: new Date().toISOString() }))
-        })
-        setShowPlan(false)
-      }} disabled={selected.length === 0}
-        className="mt-4 w-full py-2.5 rounded-xl text-sm text-white bg-sage disabled:opacity-40">✓ 定下计划</button>
-    </ModalShell>
-  )
-
-  const plannedTypes = hasPlans
-    ? record.modules.job.plans.map(p => p.type)
-    : selected
-
-  return (
-    <ModalShell icon="💼" onClose={onClose}>
-      <div className="text-center mb-4">
-        <h3 className="text-base text-caramel font-medium">Done</h3>
-        <p className="text-xs text-deep-brown mt-0.5">实际完成了什么？</p>
-      </div>
-      <div className="flex flex-col gap-2">
-        {plannedTypes.map(type => (
-          <div key={type} className="bg-white rounded-xl px-4 py-3 border border-warm-gray">
-            <div className="flex items-center gap-2.5" onClick={() => setDoneSet(prev => {
-              const next = new Set(prev)
-              if (next.has(type)) next.delete(type)
-              else next.add(type)
-              return next
-            })}>
-              <span className={`w-4.5 h-4.5 rounded border-2 flex items-center justify-center text-xs cursor-pointer ${
-                doneSet.has(type) ? 'bg-sage border-sage text-white' : 'border-light-brown'
-              }`}>{doneSet.has(type) ? '✓' : ''}</span>
-              <span className={`text-sm ${doneSet.has(type) ? 'text-deep-brown line-through' : 'text-caramel'}`}>
-                {PLAN_OPTIONS.find(o => o.type === type)?.icon} {PLAN_OPTIONS.find(o => o.type === type)?.label.replace(/\d+/, '') || type}
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
-      <button onClick={() => {
-        updateData(d => {
-          const today = d.records.find(r => r.date === getTodayStr())
-          if (!today) return
-          today.modules.job.dones = Array.from(doneSet).map(type => ({
-            type: type as JobPlanType,
-            count: doneCounts[type] ?? 5,
-            timestamp: new Date().toISOString(),
-          }))
-          if (doneSet.size > 0) today.modules.job.completed = true
-        })
-        if (doneSet.size > 0) onComplete()
-        onClose()
-      }} className="mt-4 w-full py-2.5 rounded-xl text-sm text-white bg-light-brown">✓ 更新完成</button>
-    </ModalShell>
   )
 }
 
