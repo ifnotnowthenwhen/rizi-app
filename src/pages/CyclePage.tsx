@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useAppData } from '../hooks/useLocalStorage'
 import { getDaysUntilNextReset, isCompletedThisCycle } from '../utils/storage'
 import type { RecurringTask, CustomUnit, RecurringFrequency } from '../types'
@@ -82,24 +82,7 @@ export default function CyclePage() {
   const [confettiTrigger, setConfettiTrigger] = useState(0)
   const totalCompletions = tasks.reduce((sum, t) => sum + (t.completedCount || 0), 0)
 
-  // Celebration animation for count increases
-  const [celebrationSparkles, setCelebrationSparkles] = useState<{ id: number; x: number; emoji: string; delay: number }[]>([])
-  const prevCountRef = useRef(totalCompletions)
-
-  useEffect(() => {
-    if (totalCompletions > prevCountRef.current && prevCountRef.current > 0) {
-      const emojis = ['✨', '🌟', '⭐', '🎉', '🎊', '💫']
-      const newSparkles = Array.from({ length: 8 }, (_, i) => ({
-        id: totalCompletions * 100 + i,
-        x: 10 + Math.random() * 80,
-        emoji: emojis[i % emojis.length],
-        delay: Math.random() * 0.3,
-      }))
-      setCelebrationSparkles(newSparkles)
-      setTimeout(() => setCelebrationSparkles([]), 1500)
-    }
-    prevCountRef.current = totalCompletions
-  }, [totalCompletions])
+  const DOT_COLORS = ['#A8B5A2', '#D4C5A9', '#8B7E74', '#6B5B4F', '#C8D0C4', '#9CAF94', '#B8A89A', '#E8E0D0']
 
   const getMilestoneText = (count: number): string => {
     if (count === 0) return '开始你的第一个循环吧 🌱'
@@ -216,37 +199,30 @@ export default function CyclePage() {
   return (
     <div className="py-6">
 
-      {/* Stats card - celebratory cumulative counter with sparkle burst */}
+      {/* Stats card - cumulative counter with dot growth visual */}
       {tasks.length > 0 && (
         <div className="bg-white rounded-2xl px-6 py-6 border border-warm-gray shadow-sm mb-6 relative overflow-hidden">
-          {/* Decorative gradient bar at top */}
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-sage via-light-brown to-sage" />
-
           <div className="flex flex-col items-center">
-            {/* Large celebratory number */}
-            <div className="relative">
-              <span className="text-6xl font-light text-caramel tabular-nums">{totalCompletions}</span>
-              <span className="text-xs text-deep-brown ml-1">次</span>
-            </div>
-
-            {/* Subtitle */}
+            <div className="text-6xl font-light text-caramel tabular-nums">{totalCompletions}</div>
             <div className="text-xs text-deep-brown mt-1 tracking-wider">循环 · 今年已完成</div>
-
-            {/* Milestone message */}
-            <div className="mt-3.5 text-xs text-sage-dark bg-sage-light/80 rounded-full px-4 py-1.5">
+            <div className="mt-4 text-xs text-sage-dark bg-sage-light/80 rounded-full px-5 py-1.5">
               {getMilestoneText(totalCompletions)}
             </div>
-
-            {/* Celebration sparkles */}
-            {celebrationSparkles.length > 0 && (
-              <div className="absolute inset-0 pointer-events-none">
-                {celebrationSparkles.map(s => (
-                  <span key={s.id}
-                    className="absolute animate-float-up text-base"
-                    style={{ left: `${s.x}%`, bottom: '20%', animationDelay: `${s.delay}s` }}>
-                    {s.emoji}
-                  </span>
+            {totalCompletions > 0 && (
+              <div className="mt-5 flex items-center justify-center gap-1.5 flex-wrap px-2">
+                {Array.from({ length: Math.min(totalCompletions, 15) }).map((_, i) => (
+                  <div key={i}
+                    className="w-2.5 h-2.5 rounded-full animate-pop-in shadow-sm"
+                    style={{
+                      backgroundColor: DOT_COLORS[i % DOT_COLORS.length],
+                      animationDelay: `${i * 0.04}s`,
+                    }}
+                  />
                 ))}
+                {totalCompletions > 15 && (
+                  <span className="text-xs text-light-brown ml-1 font-medium">+{totalCompletions - 15}</span>
+                )}
               </div>
             )}
           </div>
