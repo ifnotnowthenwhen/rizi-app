@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAppData } from '../hooks/useLocalStorage'
 import { getDaysUntilNextReset, isCompletedThisCycle } from '../utils/storage'
 import type { RecurringTask, CustomUnit, RecurringFrequency } from '../types'
@@ -52,68 +52,6 @@ function ConfettiEffect({ trigger }: { trigger: number }) {
   )
 }
 
-function StarJar({ count, prevCount }: { count: number; prevCount: number }) {
-  const maxStars = 10
-  const filled = Math.min(count, maxStars)
-  const [animatingStar, setAnimatingStar] = useState(false)
-  const [showSparkle, setShowSparkle] = useState(false)
-
-  useEffect(() => {
-    if (count > prevCount && prevCount > 0) {
-      setAnimatingStar(true)
-      setTimeout(() => {
-        setAnimatingStar(false)
-        setShowSparkle(true)
-        setTimeout(() => setShowSparkle(false), 600)
-      }, 400)
-    }
-  }, [count, prevCount])
-
-  return (
-    <div className="relative flex-shrink-0">
-      <div className="relative w-14 h-20">
-        <svg width="56" height="80" viewBox="0 0 56 80" className="absolute inset-0">
-          <path d="M14 8 L12 12 L8 72 Q8 78 14 78 L42 78 Q48 78 48 72 L44 12 L42 8 Z"
-            fill="none" stroke="#D4C5A9" strokeWidth="1.5" opacity="0.6" />
-          <rect x="18" y="2" width="20" height="8" rx="2"
-            fill="none" stroke="#D4C5A9" strokeWidth="1.5" opacity="0.6" />
-          <rect x="16" y="0" width="24" height="3" rx="1.5"
-            fill="#D4C5A9" opacity="0.4" />
-          {Array.from({ length: maxStars }).map((_, i) => {
-            if (i >= filled) return null
-            const col = i % 2
-            const row = Math.floor(i / 2)
-            const x = 16 + col * 16
-            const y = 58 - row * 14
-            const isNew = i === filled - 1 && animatingStar
-            return (
-              <text key={i} x={x} y={y} fontSize="10"
-                fill="#D4C5A9"
-                className={isNew ? 'animate-star-drop' : ''}
-                style={{ animationDelay: '0.2s' }}>
-                ★
-              </text>
-            )
-          })}
-        </svg>
-        {animatingStar && (
-          <svg width="56" height="80" viewBox="0 0 56 80" className="absolute inset-0 pointer-events-none">
-            <text x="28" y="10" fontSize="12" fill="#A8B5A2"
-              className="animate-star-throw">
-              ★
-            </text>
-          </svg>
-        )}
-        {showSparkle && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <span className="text-lg animate-sparkle">✨</span>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
 function getLast5AM(): Date {
   const now = new Date()
   const hour = now.getHours()
@@ -143,12 +81,35 @@ export default function CyclePage() {
   const [newTaskCustomUnit, setNewTaskCustomUnit] = useState<CustomUnit>('day')
   const [confettiTrigger, setConfettiTrigger] = useState(0)
   const totalCompletions = tasks.reduce((sum, t) => sum + (t.completedCount || 0), 0)
-  const [prevCount, setPrevCount] = useState(totalCompletions)
+
+  // Celebration animation for count increases
+  const [celebrationSparkles, setCelebrationSparkles] = useState<{ id: number; x: number; emoji: string; delay: number }[]>([])
+  const prevCountRef = useRef(totalCompletions)
+
   useEffect(() => {
-    if (totalCompletions !== prevCount) {
-      setPrevCount(totalCompletions)
+    if (totalCompletions > prevCountRef.current && prevCountRef.current > 0) {
+      const emojis = ['✨', '🌟', '⭐', '🎉', '🎊', '💫']
+      const newSparkles = Array.from({ length: 8 }, (_, i) => ({
+        id: totalCompletions * 100 + i,
+        x: 10 + Math.random() * 80,
+        emoji: emojis[i % emojis.length],
+        delay: Math.random() * 0.3,
+      }))
+      setCelebrationSparkles(newSparkles)
+      setTimeout(() => setCelebrationSparkles([]), 1500)
     }
+    prevCountRef.current = totalCompletions
   }, [totalCompletions])
+
+  const getMilestoneText = (count: number): string => {
+    if (count === 0) return '开始你的第一个循环吧 🌱'
+    if (count < 5) return '小小的积累，正在发芽 🌱'
+    if (count < 10) return '坚持得不错，继续保持 🌿'
+    if (count < 20) return '你已经形成了节奏感 🌳'
+    if (count < 50) return '生活正在稳步向前 🏡'
+    if (count < 100) return '了不起的坚持！你已经创造了习惯 🌟'
+    return '循环已成为你生活的一部分 ✨'
+  }
 
   // Todo state
   const [showAddTodo, setShowAddTodo] = useState(false)
@@ -255,23 +216,39 @@ export default function CyclePage() {
   return (
     <div className="py-6">
 
-      {/* Stats card - cumulative yearly counter with star jar */}
+      {/* Stats card - celebratory cumulative counter with sparkle burst */}
       {tasks.length > 0 && (
-        <div className="bg-white rounded-2xl px-5 py-4 border border-warm-gray shadow-sm mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">🌔</span>
-              <div>
-                <div className="text-xs text-deep-brown tracking-wide">今年已完成的循环</div>
-                <div className="text-xl font-light text-caramel mt-0.5">{totalCompletions} 次</div>
+        <div className="bg-white rounded-2xl px-6 py-6 border border-warm-gray shadow-sm mb-6 relative overflow-hidden">
+          {/* Decorative gradient bar at top */}
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-sage via-light-brown to-sage" />
+
+          <div className="flex flex-col items-center">
+            {/* Large celebratory number */}
+            <div className="relative">
+              <span className="text-6xl font-light text-caramel tabular-nums">{totalCompletions}</span>
+              <span className="text-xs text-deep-brown ml-1">次</span>
+            </div>
+
+            {/* Subtitle */}
+            <div className="text-xs text-deep-brown mt-1 tracking-wider">循环 · 今年已完成</div>
+
+            {/* Milestone message */}
+            <div className="mt-3.5 text-xs text-sage-dark bg-sage-light/80 rounded-full px-4 py-1.5">
+              {getMilestoneText(totalCompletions)}
+            </div>
+
+            {/* Celebration sparkles */}
+            {celebrationSparkles.length > 0 && (
+              <div className="absolute inset-0 pointer-events-none">
+                {celebrationSparkles.map(s => (
+                  <span key={s.id}
+                    className="absolute animate-float-up text-base"
+                    style={{ left: `${s.x}%`, bottom: '20%', animationDelay: `${s.delay}s` }}>
+                    {s.emoji}
+                  </span>
+                ))}
               </div>
-            </div>
-            <div className="flex flex-col items-center">
-              <StarJar count={totalCompletions} prevCount={prevCount} />
-              {totalCompletions > 10 && (
-                <div className="text-[10px] text-light-brown text-center mt-1">+{totalCompletions - 10}</div>
-              )}
-            </div>
+            )}
           </div>
         </div>
       )}
