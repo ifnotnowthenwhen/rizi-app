@@ -60,9 +60,8 @@ export default function TodayPage() {
       let detail = ''
       if (m === 'job') {
         const j = done as any
-        const jLabels: Record<string, string> = { collect: '收藏', submit: '投递', resume: '修改简历', portfolio: '修改作品集' }
+        const jLabels: Record<string, string> = { collect: '收藏 5 个岗位', submit: '投递 5 份简历', resume: '修改简历', portfolio: '修改作品集' }
         detail = jLabels[j.type] || j.type
-        if (j.count) detail += ` ${j.count}${j.type === 'collect' ? ' 个' : ' 份'}`
         if (j.type === 'custom') detail = j.customText || '干点别的'
       } else if (m === 'input') {
         const i = done as any

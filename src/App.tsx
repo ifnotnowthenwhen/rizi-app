@@ -3,6 +3,7 @@ import BottomNav from './components/BottomNav'
 import HomePage from './pages/HomePage'
 import WeeklyPage from './pages/WeeklyPage'
 import TodayPage from './pages/TodayPage'
+import CyclePage from './pages/CyclePage'
 import type { TabType } from './types'
 
 export default function App() {
@@ -14,6 +15,7 @@ export default function App() {
         {activeTab === 'home' && <HomePage />}
         {activeTab === 'weekly' && <WeeklyPage />}
         {activeTab === 'today' && <TodayPage />}
+        {activeTab === 'cycle' && <CyclePage />}
       </main>
       <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
     </div>

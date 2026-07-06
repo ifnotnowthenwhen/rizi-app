@@ -57,13 +57,12 @@ function formatDoneDetail(module: ModuleType, done: JobDone | InputDone | BodyDo
       const j = done as JobDone
       if (j.type === 'custom') return j.customText || '干点别的'
       const typeLabel: Record<string, string> = {
-        collect: '收藏',
-        submit: '投递',
+        collect: '收藏 5 个岗位',
+        submit: '投递 5 份简历',
         resume: '修改简历',
         portfolio: '修改作品集',
       }
-      const label = typeLabel[j.type] || j.type
-      return j.count ? `${label} ${j.count}${j.type === 'collect' ? ' 个' : ' 份'}` : label
+      return typeLabel[j.type] || j.type
     }
     case 'input': {
       const i = done as InputDone

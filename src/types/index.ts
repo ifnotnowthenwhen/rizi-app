@@ -98,13 +98,35 @@ export interface DayRecord {
   }
 }
 
+// ===== 循环模块 =====
+export type RecurringFrequency = 'weekly' | 'monthly' | 'yearly'
+
+export interface RecurringTask {
+  id: string
+  title: string
+  icon: string
+  frequency: RecurringFrequency
+  lastCompletedDate?: string  // ISO date when user last marked as done
+  createdAt: string
+}
+
+export interface TodoItem {
+  id: string
+  text: string
+  completed: boolean
+  createdAt: string
+  completedAt?: string
+}
+
 // ===== 全局数据 =====
 export interface AppData {
   records: DayRecord[]
+  recurringTasks: RecurringTask[]
+  todos: TodoItem[]
 }
 
 // ===== 模块标识 =====
 export type ModuleType = 'job' | 'input' | 'body' | 'trace'
 
 // ===== Tab 标识 =====
-export type TabType = 'home' | 'weekly' | 'today'
+export type TabType = 'home' | 'weekly' | 'today' | 'cycle'

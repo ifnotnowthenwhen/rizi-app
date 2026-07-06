@@ -92,6 +92,16 @@ export default function HomePage() {
         timestamp: now,
       }
       if (foundPlan.customText) doneEntry.customText = foundPlan.customText
+
+      // Attach default count/duration so Today/Weekly pages display correctly
+      if (module === 'job' && (foundPlan.type === 'collect' || foundPlan.type === 'submit')) {
+        doneEntry.count = 5
+      } else if (module === 'input') {
+        doneEntry.duration = 20
+      } else if (module === 'body') {
+        doneEntry.duration = 20
+      }
+
       record.modules[module].dones.push(doneEntry)
 
       if (record.modules[module].dones.length > 0) {
