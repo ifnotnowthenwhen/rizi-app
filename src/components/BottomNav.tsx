@@ -6,9 +6,9 @@ interface Props {
 }
 
 const tabs: { key: TabType; icon: string; label: string }[] = [
-  { key: 'today', icon: '👀', label: '回顾' },
-  { key: 'home', icon: '🌱', label: '一日' },
-  { key: 'cycle', icon: '🔄', label: '循环' },
+  { key: 'today', icon: '🐾', label: '回顾' },
+  { key: 'home', icon: '🌳', label: '一日' },
+  { key: 'cycle', icon: '🌘', label: '循环' },
   { key: 'weekly', icon: '📅', label: '一周' },
 ]
 

@@ -3,12 +3,19 @@ import { useAppData } from '../hooks/useLocalStorage'
 import { getNextReset, getDaysUntilNextReset, isCompletedThisCycle, getCycleDays } from '../utils/storage'
 import type { RecurringTask, TodoItem, RecurringFrequency } from '../types'
 
+function getLast5AM(): Date {
+  const now = new Date()
+  const hour = now.getHours()
+  // If hour < 5, today's 5AM hasn't happened yet — use yesterday's 5AM.
+  // Otherwise use today's 5AM (same code, date stays the same).
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 5, 0, 0, 0)
+}
+
 function CircularProgress({ task }: { task: RecurringTask }) {
   const total = getCycleDays(task)
   const now = new Date()
   const nextReset = getNextReset(task)
   const lastReset = new Date(nextReset)
-  // Go back one cycle to get the start of this cycle
   switch (task.frequency) {
     case 'weekly': lastReset.setDate(lastReset.getDate() - 7); break
     case 'monthly': lastReset.setMonth(lastReset.getMonth() - 1); break
@@ -17,26 +24,41 @@ function CircularProgress({ task }: { task: RecurringTask }) {
   }
 
   const elapsed = Math.floor((now.getTime() - lastReset.getTime()) / (1000 * 60 * 60 * 24))
-  const pct = Math.min(100, Math.round((elapsed / total) * 100))
-  const radius = 14
+  // Invert: show remaining instead of elapsed
+  const remaining = Math.max(0, total - elapsed)
+  const pct = total > 0 ? (remaining / total) * 100 : 0
+  const daysLeft = getDaysUntilNextReset(task)
+
+  const radius = 16
   const circumference = 2 * Math.PI * radius
   const offset = circumference - (pct / 100) * circumference
 
+  // Color: green when lots of time, amber when medium, red when urgent
+  let strokeColor = '#A8B5A2' // sage (default)
+  if (daysLeft <= 1) strokeColor = '#D4A574' // warm amber (urgent)
+  else if (daysLeft <= 3) strokeColor = '#C8D0C4' // lighter sage (getting close)
+
   return (
-    <svg width="36" height="36" viewBox="0 0 36 36" className="flex-shrink-0">
-      <circle cx="18" cy="18" r={radius} fill="none" stroke="#E8E0D0" strokeWidth="3" />
-      <circle cx="18" cy="18" r={radius} fill="none" stroke="#A8B5A2" strokeWidth="3"
-        strokeDasharray={circumference}
-        strokeDashoffset={offset}
-        strokeLinecap="round"
-        transform="rotate(-90 18 18)"
-        className="transition-all duration-500"
-      />
-      <text x="18" y="18" textAnchor="middle" dominantBaseline="central"
-        className="text-[9px]" fill="#6B5B4F">
-        {pct}%
-      </text>
-    </svg>
+    <div className="relative flex-shrink-0">
+      <svg width="42" height="42" viewBox="0 0 42 42">
+        {/* Background circle */}
+        <circle cx="21" cy="21" r={radius} fill="none" stroke="#E8E0D0" strokeWidth="3.5" />
+        {/* Progress circle - full when just started, empty when time is up */}
+        <circle cx="21" cy="21" r={radius} fill="none" stroke={strokeColor} strokeWidth="3.5"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          transform="rotate(-90 21 21)"
+          className="transition-all duration-700 ease-out"
+        />
+      </svg>
+      {/* Small decorative dot in center */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className={`w-2 h-2 rounded-full ${
+          daysLeft <= 1 ? 'bg-amber-400' : 'bg-sage'
+        }`} />
+      </div>
+    </div>
   )
 }
 
@@ -44,6 +66,13 @@ export default function CyclePage() {
   const { data, updateData } = useAppData()
   const tasks = data.recurringTasks || []
   const todos = data.todos || []
+  const visibleTodos = (todos).filter(todo => {
+    if (!todo.completed) return true // incomplete always show
+    if (!todo.completedAt) return true // no completedAt, show it
+    const completedTime = new Date(todo.completedAt).getTime()
+    const cutoff = getLast5AM().getTime()
+    return completedTime >= cutoff // completed after last 5AM → still show
+  })
 
   // Recurring task state
   const [showAddTask, setShowAddTask] = useState(false)
@@ -165,7 +194,7 @@ export default function CyclePage() {
         )}
 
         <div className="flex flex-col gap-2">
-          {todos.map(todo => (
+          {visibleTodos.map(todo => (
             <div key={todo.id} className={`bg-white rounded-xl px-4 py-3 border transition-all ${
               todo.completed ? 'border-warm-gray opacity-50' : 'border-warm-gray'
             }`}>
@@ -234,46 +263,47 @@ export default function CyclePage() {
             })
             .map(task => {
               const completed = isCompletedThisCycle(task)
+              const daysLeft = getDaysUntilNextReset(task)
               return (
-              <div key={task.id} className={`bg-white rounded-xl px-4 py-3 border transition-all ${
-                completed ? 'border-sage/30 opacity-60' : 'border-warm-gray'
+              <div key={task.id} className={`bg-white rounded-2xl px-4 py-3.5 border transition-all shadow-sm ${
+                completed ? 'border-sage/20 opacity-55' : 'border-warm-gray'
               }`}>
-                <div className="flex items-center gap-3">
-                  <span className="text-xl">{task.icon}</span>
+                <div className="flex items-center gap-3.5">
+                  <span className="text-2xl">{task.icon}</span>
                   <CircularProgress task={task} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className={`text-sm ${completed ? 'text-deep-brown line-through' : 'text-caramel'}`}>
+                      <span className={`text-sm font-medium ${completed ? 'text-deep-brown line-through' : 'text-caramel'}`}>
                         {task.title}
                       </span>
-                      <span className="text-[10px] text-light-brown bg-cream px-1.5 py-0.5 rounded">
+                      <span className="text-[10px] text-deep-brown bg-cream px-2 py-0.5 rounded-full border border-warm-gray">
                         {getFreqDisplay(task)}
                       </span>
                     </div>
-                    <div className="text-xs mt-0.5">
+                    <div className="text-xs mt-1">
                       {completed ? (
-                        <span className="text-sage">✓ 已完成 · 距重置还有 {getDaysUntilNextReset(task)} 天</span>
+                        <span className="text-sage">✓ 已完成</span>
                       ) : (
-                        <span className={getDaysUntilNextReset(task) <= 1 ? 'text-amber-600 font-medium' : 'text-deep-brown'}>
-                          还有 {getDaysUntilNextReset(task)} 天
+                        <span className={daysLeft <= 1 ? 'text-amber-600 font-medium' : 'text-deep-brown'}>
+                          {daysLeft <= 0 ? '今天截止' : `还有 ${daysLeft} 天`}
                         </span>
                       )}
                     </div>
                   </div>
-                  <div className="flex gap-1 items-center">
+                  <div className="flex gap-1.5 items-center">
                     {completed ? (
                       <button onClick={() => unmarkTaskDone(task.id)}
-                        className="text-xs px-2.5 py-1 rounded-lg bg-cream text-deep-brown border border-warm-gray hover:bg-warm-gray transition-colors">
+                        className="text-xs px-2.5 py-1.5 rounded-lg bg-cream text-deep-brown border border-warm-gray hover:bg-warm-gray transition-colors">
                         撤销
                       </button>
                     ) : (
                       <button onClick={() => markTaskDone(task.id)}
-                        className="w-8 h-8 rounded-full bg-sage text-white flex items-center justify-center hover:bg-sage/90 transition-colors text-sm">
+                        className="w-9 h-9 rounded-full bg-sage text-white flex items-center justify-center hover:bg-sage/90 transition-colors text-base shadow-sm">
                         ✓
                       </button>
                     )}
                     <button onClick={() => deleteTask(task.id)}
-                      className="text-xs px-1.5 py-1 rounded-lg text-light-brown hover:text-deep-brown transition-colors">
+                      className="text-xs px-1.5 py-1 text-light-brown hover:text-deep-brown transition-colors opacity-50 hover:opacity-100">
                       ✕
                     </button>
                   </div>
