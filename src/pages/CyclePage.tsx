@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useAppData } from '../hooks/useLocalStorage'
 import { getDaysUntilNextReset, isCompletedThisCycle } from '../utils/storage'
 import type { RecurringTask, CustomUnit, RecurringFrequency } from '../types'
@@ -52,6 +52,68 @@ function ConfettiEffect({ trigger }: { trigger: number }) {
   )
 }
 
+function StarJar({ count, prevCount }: { count: number; prevCount: number }) {
+  const maxStars = 10
+  const filled = Math.min(count, maxStars)
+  const [animatingStar, setAnimatingStar] = useState(false)
+  const [showSparkle, setShowSparkle] = useState(false)
+
+  useEffect(() => {
+    if (count > prevCount && prevCount > 0) {
+      setAnimatingStar(true)
+      setTimeout(() => {
+        setAnimatingStar(false)
+        setShowSparkle(true)
+        setTimeout(() => setShowSparkle(false), 600)
+      }, 400)
+    }
+  }, [count, prevCount])
+
+  return (
+    <div className="relative flex-shrink-0">
+      <div className="relative w-14 h-20">
+        <svg width="56" height="80" viewBox="0 0 56 80" className="absolute inset-0">
+          <path d="M14 8 L12 12 L8 72 Q8 78 14 78 L42 78 Q48 78 48 72 L44 12 L42 8 Z"
+            fill="none" stroke="#D4C5A9" strokeWidth="1.5" opacity="0.6" />
+          <rect x="18" y="2" width="20" height="8" rx="2"
+            fill="none" stroke="#D4C5A9" strokeWidth="1.5" opacity="0.6" />
+          <rect x="16" y="0" width="24" height="3" rx="1.5"
+            fill="#D4C5A9" opacity="0.4" />
+          {Array.from({ length: maxStars }).map((_, i) => {
+            if (i >= filled) return null
+            const col = i % 2
+            const row = Math.floor(i / 2)
+            const x = 16 + col * 16
+            const y = 58 - row * 14
+            const isNew = i === filled - 1 && animatingStar
+            return (
+              <text key={i} x={x} y={y} fontSize="10"
+                fill="#D4C5A9"
+                className={isNew ? 'animate-star-drop' : ''}
+                style={{ animationDelay: '0.2s' }}>
+                ★
+              </text>
+            )
+          })}
+        </svg>
+        {animatingStar && (
+          <svg width="56" height="80" viewBox="0 0 56 80" className="absolute inset-0 pointer-events-none">
+            <text x="28" y="10" fontSize="12" fill="#A8B5A2"
+              className="animate-star-throw">
+              ★
+            </text>
+          </svg>
+        )}
+        {showSparkle && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <span className="text-lg animate-sparkle">✨</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function getLast5AM(): Date {
   const now = new Date()
   const hour = now.getHours()
@@ -80,6 +142,13 @@ export default function CyclePage() {
   const [newTaskCustomValue, setNewTaskCustomValue] = useState(1)
   const [newTaskCustomUnit, setNewTaskCustomUnit] = useState<CustomUnit>('day')
   const [confettiTrigger, setConfettiTrigger] = useState(0)
+  const totalCompletions = tasks.reduce((sum, t) => sum + (t.completedCount || 0), 0)
+  const [prevCount, setPrevCount] = useState(totalCompletions)
+  useEffect(() => {
+    if (totalCompletions !== prevCount) {
+      setPrevCount(totalCompletions)
+    }
+  }, [totalCompletions])
 
   // Todo state
   const [showAddTodo, setShowAddTodo] = useState(false)
@@ -186,45 +255,26 @@ export default function CyclePage() {
   return (
     <div className="py-6">
 
-      {/* Stats card - cumulative yearly counter */}
-      {tasks.length > 0 && (() => {
-        const totalCompletions = tasks.reduce((sum, t) => sum + (t.completedCount || 0), 0)
-        return (
-          <div className="bg-white rounded-2xl px-5 py-5 border border-warm-gray shadow-sm mb-6">
-            <div className="flex items-center gap-4">
-              {/* Animated ring counter */}
-              <div className="relative w-16 h-16 flex items-center justify-center flex-shrink-0">
-                <svg className="absolute inset-0" width="64" height="64" viewBox="0 0 64 64">
-                  {/* Background ring */}
-                  <circle cx="32" cy="32" r="26" fill="none" stroke="#E8E0D0" strokeWidth="3" />
-                  {/* Progress ring */}
-                  <circle cx="32" cy="32" r="26" fill="none" stroke="#A8B5A2" strokeWidth="3"
-                    strokeDasharray={163.36}
-                    strokeDashoffset={163.36 * (1 - Math.min(1, totalCompletions / 365))}
-                    strokeLinecap="round"
-                    transform="rotate(-90 32 32)"
-                    className="transition-all duration-1000 ease-out" />
-                </svg>
-                <span className="text-xl font-light text-caramel">{totalCompletions}</span>
-              </div>
-              {/* Text */}
+      {/* Stats card - cumulative yearly counter with star jar */}
+      {tasks.length > 0 && (
+        <div className="bg-white rounded-2xl px-5 py-4 border border-warm-gray shadow-sm mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🌔</span>
               <div>
                 <div className="text-xs text-deep-brown tracking-wide">今年已完成的循环</div>
-                <div className="text-base text-caramel font-medium mt-0.5">{totalCompletions} 次</div>
-                <div className="text-[11px] text-light-brown mt-0.5">每一次完成都是生活的印记 ✨</div>
+                <div className="text-xl font-light text-caramel mt-0.5">{totalCompletions} 次</div>
               </div>
             </div>
-            {/* Mini progress toward 365 */}
-            <div className="mt-3.5 flex items-center gap-2">
-              <div className="flex-1 h-1.5 bg-warm-gray rounded-full overflow-hidden">
-                <div className="h-full bg-sage rounded-full transition-all duration-700 ease-out"
-                  style={{ width: `${Math.min(100, (totalCompletions / 365) * 100)}%` }} />
-              </div>
-              <span className="text-[10px] text-light-brown">{Math.min(100, Math.round((totalCompletions / 365) * 100))}%</span>
+            <div className="flex flex-col items-center">
+              <StarJar count={totalCompletions} prevCount={prevCount} />
+              {totalCompletions > 10 && (
+                <div className="text-[10px] text-light-brown text-center mt-1">+{totalCompletions - 10}</div>
+              )}
             </div>
           </div>
-        )
-      })()}
+        </div>
+      )}
 
       {/* ===== 记得要做 (Todos first) ===== */}
       <div className="mb-8">
