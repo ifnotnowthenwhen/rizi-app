@@ -3,6 +3,40 @@ import { useAppData } from '../hooks/useLocalStorage'
 import { getDaysUntilNextReset, isCompletedThisCycle } from '../utils/storage'
 import type { RecurringTask, CustomUnit, RecurringFrequency } from '../types'
 
+// Dot matrix constants
+const MATRIX_SIZE = 25
+const MATRIX_COLS = 5
+const MATRIX_ROWS = 5
+
+const DOT_COLORS = [
+  { light: '#7B9BB5', dark: '#2C4A6B' },  // Deep blue
+  { light: '#8BB57B', dark: '#3C5A2C' },  // Forest green
+  { light: '#9B8BB5', dark: '#4C3C6B' },  // Plum purple
+  { light: '#B59B7B', dark: '#6B4C2C' },  // Rust orange
+  { light: '#B58B9B', dark: '#6B3C4C' },  // Rose pink
+  { light: '#8BABA5', dark: '#3C5A4C' },  // Teal
+  { light: '#A5B5C5', dark: '#5B6B8B' },  // Slate blue
+  { light: '#B5C5A5', dark: '#6B7B4C' },  // Sage
+]
+
+function hexToRgb(hex: string) {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+  return result ? {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16),
+  } : { r: 200, g: 200, b: 200 }
+}
+
+function lerpColor(color1: string, color2: string, t: number): string {
+  const c1 = hexToRgb(color1)
+  const c2 = hexToRgb(color2)
+  const r = Math.round(c1.r + (c2.r - c1.r) * t)
+  const g = Math.round(c1.g + (c2.g - c1.g) * t)
+  const b = Math.round(c1.b + (c2.b - c1.b) * t)
+  return `rgb(${r}, ${g}, ${b})`
+}
+
 const CONFETTI_COLORS = ['#FF6B6B', '#FFD93D', '#6BCB77', '#4D96FF', '#FF8E9E', '#C084FC', '#FB923C']
 
 function ConfettiEffect({ trigger }: { trigger: number }) {
@@ -81,8 +115,9 @@ export default function CyclePage() {
   const [newTaskCustomUnit, setNewTaskCustomUnit] = useState<CustomUnit>('day')
   const [confettiTrigger, setConfettiTrigger] = useState(0)
   const totalCompletions = tasks.reduce((sum, t) => sum + (t.completedCount || 0), 0)
-
-  const DOT_COLORS = ['#A8B5A2', '#D4C5A9', '#8B7E74', '#6B5B4F', '#C8D0C4', '#9CAF94', '#B8A89A', '#E8E0D0']
+  const filledInCycle = totalCompletions % MATRIX_SIZE
+  const currentCycle = Math.floor(totalCompletions / MATRIX_SIZE)
+  const colorFamily = DOT_COLORS[currentCycle % DOT_COLORS.length]
 
   const getMilestoneText = (count: number): string => {
     if (count === 0) return '开始你的第一个循环吧 🌱'
@@ -199,32 +234,50 @@ export default function CyclePage() {
   return (
     <div className="py-6">
 
-      {/* Stats card - cumulative counter with dot growth visual */}
+      {/* Stats card - dot matrix with color cycle */}
       {tasks.length > 0 && (
-        <div className="bg-white rounded-2xl px-6 py-6 border border-warm-gray shadow-sm mb-6 relative overflow-hidden">
+        <div className="bg-white rounded-2xl px-5 py-5 border border-warm-gray shadow-sm mb-6 relative overflow-hidden">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-sage via-light-brown to-sage" />
-          <div className="flex flex-col items-center">
-            <div className="text-6xl font-light text-caramel tabular-nums">{totalCompletions}</div>
-            <div className="text-xs text-deep-brown mt-1 tracking-wider">循环 · 今年已完成</div>
-            <div className="mt-4 text-xs text-sage-dark bg-sage-light/80 rounded-full px-5 py-1.5">
-              {getMilestoneText(totalCompletions)}
-            </div>
-            {totalCompletions > 0 && (
-              <div className="mt-5 flex items-center justify-center gap-1.5 flex-wrap px-2">
-                {Array.from({ length: Math.min(totalCompletions, 15) }).map((_, i) => (
-                  <div key={i}
-                    className="w-2.5 h-2.5 rounded-full animate-pop-in shadow-sm"
-                    style={{
-                      backgroundColor: DOT_COLORS[i % DOT_COLORS.length],
-                      animationDelay: `${i * 0.04}s`,
-                    }}
-                  />
-                ))}
-                {totalCompletions > 15 && (
-                  <span className="text-xs text-light-brown ml-1 font-medium">+{totalCompletions - 15}</span>
-                )}
+          <div className="flex items-center gap-4">
+            {/* Left: info */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🌔</span>
+                <span className="text-xs text-deep-brown tracking-wide">今年已完成的循环</span>
               </div>
-            )}
+              <div className="mt-1">
+                <span className="text-4xl font-light text-caramel tabular-nums">{totalCompletions}</span>
+                <span className="text-xs text-deep-brown ml-1">次</span>
+              </div>
+              <div className="mt-2.5 text-xs text-sage-dark bg-sage-light/80 rounded-full px-3 py-1 inline-block">
+                {getMilestoneText(totalCompletions)}
+              </div>
+            </div>
+
+            {/* Right: dot matrix */}
+            <div className="flex-shrink-0">
+              <div className="grid grid-cols-5 gap-1.5">
+                {Array.from({ length: MATRIX_SIZE }).map((_, i) => {
+                  const isFilled = i < filledInCycle
+                  const gradientPos = MATRIX_SIZE > 1 ? i / (MATRIX_SIZE - 1) : 0
+                  const fillColor = lerpColor(colorFamily.light, colorFamily.dark, gradientPos)
+                  return (
+                    <div
+                      key={i}
+                      className="w-3.5 h-3.5 rounded-full transition-all duration-300"
+                      style={{
+                        backgroundColor: isFilled ? fillColor : 'transparent',
+                        border: isFilled ? 'none' : '1.5px solid #D4C5A9',
+                      }}
+                    />
+                  )
+                })}
+              </div>
+              {/* Cycle indicator */}
+              <div className="text-[10px] text-light-brown text-center mt-1.5">
+                第 {currentCycle + 1} 轮 · {MATRIX_SIZE - filledInCycle} 格剩余
+              </div>
+            </div>
           </div>
         </div>
       )}
