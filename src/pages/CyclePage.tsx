@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAppData } from '../hooks/useLocalStorage'
-import { getNextReset, getDaysUntilNextReset, isCompletedThisCycle, getCycleDays } from '../utils/storage'
-import type { RecurringTask, TodoItem, RecurringFrequency } from '../types'
+import { getDaysUntilNextReset, isCompletedThisCycle } from '../utils/storage'
+import type { RecurringTask, RecurringFrequency } from '../types'
 
 function getLast5AM(): Date {
   const now = new Date()
@@ -9,57 +9,6 @@ function getLast5AM(): Date {
   // If hour < 5, today's 5AM hasn't happened yet — use yesterday's 5AM.
   // Otherwise use today's 5AM (same code, date stays the same).
   return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 5, 0, 0, 0)
-}
-
-function CircularProgress({ task }: { task: RecurringTask }) {
-  const total = getCycleDays(task)
-  const now = new Date()
-  const nextReset = getNextReset(task)
-  const lastReset = new Date(nextReset)
-  switch (task.frequency) {
-    case 'weekly': lastReset.setDate(lastReset.getDate() - 7); break
-    case 'monthly': lastReset.setMonth(lastReset.getMonth() - 1); break
-    case 'yearly': lastReset.setFullYear(lastReset.getFullYear() - 1); break
-    case 'custom': if (task.customDays) lastReset.setDate(lastReset.getDate() - task.customDays); break
-  }
-
-  const elapsed = Math.floor((now.getTime() - lastReset.getTime()) / (1000 * 60 * 60 * 24))
-  // Invert: show remaining instead of elapsed
-  const remaining = Math.max(0, total - elapsed)
-  const pct = total > 0 ? (remaining / total) * 100 : 0
-  const daysLeft = getDaysUntilNextReset(task)
-
-  const radius = 16
-  const circumference = 2 * Math.PI * radius
-  const offset = circumference - (pct / 100) * circumference
-
-  // Color: green when lots of time, amber when medium, red when urgent
-  let strokeColor = '#A8B5A2' // sage (default)
-  if (daysLeft <= 1) strokeColor = '#D4A574' // warm amber (urgent)
-  else if (daysLeft <= 3) strokeColor = '#C8D0C4' // lighter sage (getting close)
-
-  return (
-    <div className="relative flex-shrink-0">
-      <svg width="42" height="42" viewBox="0 0 42 42">
-        {/* Background circle */}
-        <circle cx="21" cy="21" r={radius} fill="none" stroke="#E8E0D0" strokeWidth="3.5" />
-        {/* Progress circle - full when just started, empty when time is up */}
-        <circle cx="21" cy="21" r={radius} fill="none" stroke={strokeColor} strokeWidth="3.5"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-          transform="rotate(-90 21 21)"
-          className="transition-all duration-700 ease-out"
-        />
-      </svg>
-      {/* Small decorative dot in center */}
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className={`w-2 h-2 rounded-full ${
-          daysLeft <= 1 ? 'bg-amber-400' : 'bg-sage'
-        }`} />
-      </div>
-    </div>
-  )
 }
 
 export default function CyclePage() {
@@ -200,16 +149,17 @@ export default function CyclePage() {
             }`}>
               <div className="flex items-center gap-3">
                 <span onClick={() => toggleTodo(todo.id)}
-                  className={`w-5 h-5 rounded border-2 flex items-center justify-center text-xs cursor-pointer transition-all flex-shrink-0 ${
+                  className={`w-5 h-5 rounded-full border-2 flex items-center justify-center text-xs cursor-pointer transition-all flex-shrink-0 ${
                     todo.completed ? 'bg-sage border-sage text-white' : 'border-light-brown hover:border-sage'
                   }`}>
                   {todo.completed ? '✓' : ''}
                 </span>
-                <span onClick={() => toggleTodo(todo.id)} className={`flex-1 text-sm cursor-pointer ${todo.completed ? 'text-deep-brown line-through' : 'text-caramel'}`}>
+                <span onClick={() => toggleTodo(todo.id)}
+                  className={`flex-1 text-sm cursor-pointer ${todo.completed ? 'text-deep-brown line-through' : 'text-caramel'}`}>
                   {todo.text}
                 </span>
                 <button onClick={() => deleteTodo(todo.id)}
-                  className="text-xs text-light-brown hover:text-deep-brown transition-colors px-1">
+                  className="text-xs text-light-brown hover:text-deep-brown transition-colors flex-shrink-0 opacity-40 hover:opacity-100">
                   ✕
                 </button>
               </div>
@@ -264,49 +214,66 @@ export default function CyclePage() {
             .map(task => {
               const completed = isCompletedThisCycle(task)
               const daysLeft = getDaysUntilNextReset(task)
+
+              // Color for the countdown badge
+              let badgeBg = 'bg-sage/15 text-sage-dark'
+              let dotColor = 'bg-sage'
+              if (daysLeft <= 1) {
+                badgeBg = 'bg-amber-100 text-amber-700'
+                dotColor = 'bg-amber-400'
+              } else if (daysLeft <= 3) {
+                badgeBg = 'bg-sage/15 text-deep-brown'
+                dotColor = 'bg-sage'
+              }
+
               return (
-              <div key={task.id} className={`bg-white rounded-2xl px-4 py-3.5 border transition-all shadow-sm ${
+              <div key={task.id} className={`bg-white rounded-xl px-4 py-3 border transition-all ${
                 completed ? 'border-sage/20 opacity-55' : 'border-warm-gray'
               }`}>
-                <div className="flex items-center gap-3.5">
-                  <span className="text-2xl">{task.icon}</span>
-                  <CircularProgress task={task} />
+                <div className="flex items-center gap-3">
+                  {/* Icon */}
+                  <span className="text-lg flex-shrink-0">{task.icon}</span>
+
+                  {/* Title + frequency */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-sm font-medium ${completed ? 'text-deep-brown line-through' : 'text-caramel'}`}>
-                        {task.title}
-                      </span>
-                      <span className="text-[10px] text-deep-brown bg-cream px-2 py-0.5 rounded-full border border-warm-gray">
-                        {getFreqDisplay(task)}
-                      </span>
-                    </div>
-                    <div className="text-xs mt-1">
-                      {completed ? (
-                        <span className="text-sage">✓ 已完成</span>
-                      ) : (
-                        <span className={daysLeft <= 1 ? 'text-amber-600 font-medium' : 'text-deep-brown'}>
-                          {daysLeft <= 0 ? '今天截止' : `还有 ${daysLeft} 天`}
-                        </span>
-                      )}
-                    </div>
+                    <span className={`text-sm ${completed ? 'text-deep-brown line-through' : 'text-caramel'}`}>
+                      {task.title}
+                    </span>
+                    <span className="text-xs text-light-brown ml-1.5">
+                      · {getFreqDisplay(task)}
+                    </span>
                   </div>
-                  <div className="flex gap-1.5 items-center">
-                    {completed ? (
-                      <button onClick={() => unmarkTaskDone(task.id)}
-                        className="text-xs px-2.5 py-1.5 rounded-lg bg-cream text-deep-brown border border-warm-gray hover:bg-warm-gray transition-colors">
-                        撤销
-                      </button>
-                    ) : (
-                      <button onClick={() => markTaskDone(task.id)}
-                        className="w-9 h-9 rounded-full bg-sage text-white flex items-center justify-center hover:bg-sage/90 transition-colors text-base shadow-sm">
-                        ✓
-                      </button>
-                    )}
-                    <button onClick={() => deleteTask(task.id)}
-                      className="text-xs px-1.5 py-1 text-light-brown hover:text-deep-brown transition-colors opacity-50 hover:opacity-100">
-                      ✕
+
+                  {/* Status: countdown badge or completed */}
+                  {completed ? (
+                    <span className="text-xs text-sage flex-shrink-0">✓ 已完成</span>
+                  ) : (
+                    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${badgeBg} flex-shrink-0`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
+                      <span className="text-xs font-medium">
+                        {daysLeft <= 0 ? '今天' : `${daysLeft} 天`}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Action buttons */}
+                  {completed ? (
+                    <button onClick={() => unmarkTaskDone(task.id)}
+                      className="text-xs px-2.5 py-1.5 rounded-lg bg-cream text-deep-brown border border-warm-gray hover:bg-warm-gray transition-colors flex-shrink-0">
+                      撤销
                     </button>
-                  </div>
+                  ) : (
+                    <button onClick={() => markTaskDone(task.id)}
+                      className="w-8 h-8 rounded-full bg-sage text-white flex items-center justify-center hover:bg-sage/90 transition-colors text-sm shadow-sm flex-shrink-0">
+                      ✓
+                    </button>
+                  )}
+
+                  {/* Delete */}
+                  <button onClick={() => deleteTask(task.id)}
+                    className="text-xs text-light-brown hover:text-deep-brown transition-colors flex-shrink-0 opacity-40 hover:opacity-100">
+                    ✕
+                  </button>
                 </div>
               </div>
             )
