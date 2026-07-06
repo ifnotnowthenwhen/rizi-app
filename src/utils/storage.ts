@@ -88,13 +88,18 @@ export function getNextReset(task: RecurringTask): Date {
       return next
     }
     case 'custom': {
-      if (task.customDays) {
-        const next = new Date(now)
-        next.setDate(now.getDate() + task.customDays)
-        next.setHours(0, 0, 0, 0)
-        return next
+      let days = 7 // default
+      if (task.customValue && task.customUnit) {
+        switch (task.customUnit) {
+          case 'day': days = task.customValue; break
+          case 'week': days = task.customValue * 7; break
+          case 'month': days = task.customValue * 30; break
+        }
       }
-      return now
+      const next = new Date(now)
+      next.setDate(now.getDate() + days)
+      next.setHours(0, 0, 0, 0)
+      return next
     }
   }
 }
@@ -117,7 +122,15 @@ export function isCompletedThisCycle(task: RecurringTask): boolean {
     case 'monthly': lastReset.setMonth(lastReset.getMonth() - 1); break
     case 'yearly': lastReset.setFullYear(lastReset.getFullYear() - 1); break
     case 'custom': {
-      if (task.customDays) lastReset.setDate(lastReset.getDate() - task.customDays)
+      let days = 7
+      if (task.customValue && task.customUnit) {
+        switch (task.customUnit) {
+          case 'day': days = task.customValue; break
+          case 'week': days = task.customValue * 7; break
+          case 'month': days = task.customValue * 30; break
+        }
+      }
+      lastReset.setDate(lastReset.getDate() - days)
       break
     }
   }
@@ -136,6 +149,15 @@ export function getCycleDays(task: RecurringTask): number {
       const year = now.getFullYear()
       return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0 ? 366 : 365
     }
-    case 'custom': return task.customDays || 7
+    case 'custom': {
+      if (task.customValue && task.customUnit) {
+        switch (task.customUnit) {
+          case 'day': return task.customValue
+          case 'week': return task.customValue * 7
+          case 'month': return task.customValue * 30
+        }
+      }
+      return 7
+    }
   }
 }

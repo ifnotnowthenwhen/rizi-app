@@ -1,7 +1,49 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAppData } from '../hooks/useLocalStorage'
 import { getDaysUntilNextReset, isCompletedThisCycle } from '../utils/storage'
-import type { RecurringTask, RecurringFrequency } from '../types'
+import type { RecurringTask, CustomUnit, RecurringFrequency } from '../types'
+
+const CONFETTI_COLORS = ['#A8B5A2', '#D4C5A9', '#E8E0D0', '#8B7E74', '#6B5B4F', '#F5F0E8']
+
+function ConfettiEffect({ trigger }: { trigger: number }) {
+  const [particles, setParticles] = useState<{ id: number; left: number; color: string; size: number; delay: number; rotate: number }[]>([])
+
+  useEffect(() => {
+    if (trigger === 0) return
+    const newParticles = Array.from({ length: 20 }, (_, i) => ({
+      id: trigger * 1000 + i,
+      left: 20 + Math.random() * 60,
+      color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+      size: 6 + Math.random() * 8,
+      delay: Math.random() * 0.4,
+      rotate: Math.random() * 360,
+    }))
+    setParticles(newParticles)
+    const timer = setTimeout(() => setParticles([]), 3000)
+    return () => clearTimeout(timer)
+  }, [trigger])
+
+  if (particles.length === 0) return null
+
+  return (
+    <div className="fixed inset-0 pointer-events-none z-[100]">
+      {particles.map(p => (
+        <div
+          key={p.id}
+          className="confetti-particle"
+          style={{
+            left: `${p.left}%`,
+            backgroundColor: p.color,
+            width: `${p.size}px`,
+            height: `${p.size * 0.6}px`,
+            animationDelay: `${p.delay}s`,
+            transform: `rotate(${p.rotate}deg)`,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
 
 function getLast5AM(): Date {
   const now = new Date()
@@ -28,7 +70,9 @@ export default function CyclePage() {
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [newTaskIcon, setNewTaskIcon] = useState('🧹')
   const [newTaskFreq, setNewTaskFreq] = useState<RecurringFrequency>('weekly')
-  const [newTaskCustomDays, setNewTaskCustomDays] = useState(7)
+  const [newTaskCustomValue, setNewTaskCustomValue] = useState(1)
+  const [newTaskCustomUnit, setNewTaskCustomUnit] = useState<CustomUnit>('day')
+  const [confettiTrigger, setConfettiTrigger] = useState(0)
 
   // Todo state
   const [showAddTodo, setShowAddTodo] = useState(false)
@@ -44,8 +88,12 @@ export default function CyclePage() {
   }
 
   const getFreqDisplay = (task: RecurringTask): string => {
-    if (task.frequency === 'custom' && task.customDays) {
-      return `每${task.customDays}天`
+    if (task.frequency === 'custom') {
+      if (task.customValue && task.customUnit) {
+        const unitLabel = task.customUnit === 'day' ? '天' : task.customUnit === 'week' ? '周' : '个月'
+        return `每${task.customValue}${unitLabel}`
+      }
+      return '自定'
     }
     return freqLabel[task.frequency]
   }
@@ -62,7 +110,8 @@ export default function CyclePage() {
         createdAt: new Date().toISOString(),
       }
       if (newTaskFreq === 'custom') {
-        taskData.customDays = newTaskCustomDays
+        taskData.customValue = newTaskCustomValue
+        taskData.customUnit = newTaskCustomUnit
       }
       d.recurringTasks.push(taskData)
     })
@@ -83,6 +132,7 @@ export default function CyclePage() {
         task.lastCompletedDate = new Date().toISOString()
       }
     })
+    setConfettiTrigger(prev => prev + 1)
   }
 
   const unmarkTaskDone = (id: string) => {
@@ -127,7 +177,38 @@ export default function CyclePage() {
 
   return (
     <div className="py-6">
-      <h2 className="text-lg font-medium text-caramel text-center mb-6">在循环中流动</h2>
+
+      {/* Stats card */}
+      {tasks.length > 0 && (() => {
+        const completedThisCycle = tasks.filter(t => isCompletedThisCycle(t)).length
+        const totalTasks = tasks.length
+        return (
+          <div className="bg-white rounded-2xl px-5 py-4 border border-warm-gray shadow-sm mb-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-sage/10 flex items-center justify-center">
+                  <span className="text-lg">🌘</span>
+                </div>
+                <div>
+                  <div className="text-xs text-deep-brown">本周生活循环</div>
+                  <div className="text-lg font-medium text-caramel mt-0.5">
+                    {completedThisCycle}/{totalTasks} <span className="text-xs font-normal text-deep-brown">已完成</span>
+                  </div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-light text-sage">{Math.round((completedThisCycle / Math.max(1, totalTasks)) * 100)}%</div>
+                <div className="text-[10px] text-light-brown">完成率</div>
+              </div>
+            </div>
+            {/* Mini progress bar */}
+            <div className="mt-3 h-1.5 bg-warm-gray rounded-full overflow-hidden">
+              <div className="h-full bg-sage rounded-full transition-all duration-500"
+                style={{ width: `${(completedThisCycle / Math.max(1, totalTasks)) * 100}%` }} />
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ===== 记得要做 (Todos first) ===== */}
       <div className="mb-8">
@@ -309,16 +390,38 @@ export default function CyclePage() {
               ))}
             </div>
             {newTaskFreq === 'custom' && (
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-xs text-deep-brown">每</span>
-                <div className="flex bg-cream rounded-lg border border-warm-gray overflow-hidden">
-                  <button onClick={() => setNewTaskCustomDays(Math.max(1, newTaskCustomDays - 1))}
-                    className="px-2 py-1 text-xs text-deep-brown hover:bg-warm-gray">−</button>
-                  <span className="px-3 py-1 text-xs text-caramel font-medium min-w-[2rem] text-center">{newTaskCustomDays}</span>
-                  <button onClick={() => setNewTaskCustomDays(Math.min(365, newTaskCustomDays + 1))}
-                    className="px-2 py-1 text-xs text-deep-brown hover:bg-warm-gray">+</button>
+              <div className="flex flex-col gap-2 mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-deep-brown">每</span>
+                  {/* Value input with +/- and direct typing */}
+                  <div className="flex items-center bg-cream rounded-lg border border-warm-gray overflow-hidden">
+                    <button onClick={() => setNewTaskCustomValue(Math.max(1, newTaskCustomValue - 1))}
+                      className="px-2.5 py-1.5 text-sm text-deep-brown hover:bg-warm-gray transition-colors">−</button>
+                    <input
+                      type="text"
+                      value={newTaskCustomValue}
+                      onChange={e => {
+                        const val = parseInt(e.target.value, 10)
+                        if (!isNaN(val) && val >= 1) setNewTaskCustomValue(val)
+                        else if (e.target.value === '') setNewTaskCustomValue(0)
+                      }}
+                      onBlur={() => { if (newTaskCustomValue < 1) setNewTaskCustomValue(1) }}
+                      className="w-10 text-center text-sm text-caramel bg-transparent outline-none border-x border-warm-gray py-1.5"
+                      inputMode="numeric"
+                    />
+                    <button onClick={() => setNewTaskCustomValue(Math.min(999, newTaskCustomValue + 1))}
+                      className="px-2.5 py-1.5 text-sm text-deep-brown hover:bg-warm-gray transition-colors">+</button>
+                  </div>
+                  {/* Unit toggle */}
+                  <div className="flex rounded-lg border border-warm-gray overflow-hidden">
+                    {(['day', 'week', 'month'] as CustomUnit[]).map(u => (
+                      <button key={u} onClick={() => setNewTaskCustomUnit(u)}
+                        className={`px-3 py-1.5 text-xs transition-colors ${
+                          newTaskCustomUnit === u ? 'bg-sage text-white' : 'bg-cream text-deep-brown hover:bg-warm-gray'
+                        }`}>{u === 'day' ? '天' : u === 'week' ? '周' : '月'}</button>
+                    ))}
+                  </div>
                 </div>
-                <span className="text-xs text-deep-brown">天</span>
               </div>
             )}
             <div className="flex gap-2">
@@ -339,6 +442,13 @@ export default function CyclePage() {
           </button>
         )}
       </div>
+
+      {/* Bottom banner */}
+      <div className="mt-6 py-3.5 px-4 bg-sage-light rounded-xl text-center">
+        <p className="text-sm text-sage-dark italic leading-relaxed">"在循环中流动。"</p>
+      </div>
+
+      <ConfettiEffect trigger={confettiTrigger} />
     </div>
   )
 }
