@@ -87,6 +87,15 @@ export function getNextReset(task: RecurringTask): Date {
       next.setHours(0, 0, 0, 0)
       return next
     }
+    case 'custom': {
+      if (task.customDays) {
+        const next = new Date(now)
+        next.setDate(now.getDate() + task.customDays)
+        next.setHours(0, 0, 0, 0)
+        return next
+      }
+      return now
+    }
   }
 }
 
@@ -107,6 +116,26 @@ export function isCompletedThisCycle(task: RecurringTask): boolean {
     case 'weekly': lastReset.setDate(lastReset.getDate() - 7); break
     case 'monthly': lastReset.setMonth(lastReset.getMonth() - 1); break
     case 'yearly': lastReset.setFullYear(lastReset.getFullYear() - 1); break
+    case 'custom': {
+      if (task.customDays) lastReset.setDate(lastReset.getDate() - task.customDays)
+      break
+    }
   }
   return completed >= lastReset
+}
+
+export function getCycleDays(task: RecurringTask): number {
+  switch (task.frequency) {
+    case 'weekly': return 7
+    case 'monthly': {
+      const now = new Date()
+      return new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+    }
+    case 'yearly': {
+      const now = new Date()
+      const year = now.getFullYear()
+      return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0 ? 366 : 365
+    }
+    case 'custom': return task.customDays || 7
+  }
 }

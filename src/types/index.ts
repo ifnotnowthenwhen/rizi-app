@@ -99,13 +99,14 @@ export interface DayRecord {
 }
 
 // ===== 循环模块 =====
-export type RecurringFrequency = 'weekly' | 'monthly' | 'yearly'
+export type RecurringFrequency = 'weekly' | 'monthly' | 'yearly' | 'custom'
 
 export interface RecurringTask {
   id: string
   title: string
   icon: string
   frequency: RecurringFrequency
+  customDays?: number  // for 'custom' frequency
   lastCompletedDate?: string  // ISO date when user last marked as done
   createdAt: string
 }

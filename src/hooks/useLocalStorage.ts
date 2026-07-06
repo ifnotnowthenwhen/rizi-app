@@ -7,7 +7,7 @@ export function useAppData() {
 
   const updateData = useCallback((fn: (d: AppData) => void) => {
     setData(prev => {
-      const next = { ...prev, records: [...prev.records] }
+      const next = JSON.parse(JSON.stringify(prev)) as AppData
       fn(next)
       saveAppData(next)
       return next

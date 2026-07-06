@@ -1,7 +1,44 @@
 import { useState } from 'react'
 import { useAppData } from '../hooks/useLocalStorage'
-import { getNextReset, getDaysUntilNextReset, isCompletedThisCycle } from '../utils/storage'
+import { getNextReset, getDaysUntilNextReset, isCompletedThisCycle, getCycleDays } from '../utils/storage'
 import type { RecurringTask, TodoItem, RecurringFrequency } from '../types'
+
+function CircularProgress({ task }: { task: RecurringTask }) {
+  const total = getCycleDays(task)
+  const now = new Date()
+  const nextReset = getNextReset(task)
+  const lastReset = new Date(nextReset)
+  // Go back one cycle to get the start of this cycle
+  switch (task.frequency) {
+    case 'weekly': lastReset.setDate(lastReset.getDate() - 7); break
+    case 'monthly': lastReset.setMonth(lastReset.getMonth() - 1); break
+    case 'yearly': lastReset.setFullYear(lastReset.getFullYear() - 1); break
+    case 'custom': if (task.customDays) lastReset.setDate(lastReset.getDate() - task.customDays); break
+  }
+
+  const elapsed = Math.floor((now.getTime() - lastReset.getTime()) / (1000 * 60 * 60 * 24))
+  const pct = Math.min(100, Math.round((elapsed / total) * 100))
+  const radius = 14
+  const circumference = 2 * Math.PI * radius
+  const offset = circumference - (pct / 100) * circumference
+
+  return (
+    <svg width="36" height="36" viewBox="0 0 36 36" className="flex-shrink-0">
+      <circle cx="18" cy="18" r={radius} fill="none" stroke="#E8E0D0" strokeWidth="3" />
+      <circle cx="18" cy="18" r={radius} fill="none" stroke="#A8B5A2" strokeWidth="3"
+        strokeDasharray={circumference}
+        strokeDashoffset={offset}
+        strokeLinecap="round"
+        transform="rotate(-90 18 18)"
+        className="transition-all duration-500"
+      />
+      <text x="18" y="18" textAnchor="middle" dominantBaseline="central"
+        className="text-[9px]" fill="#6B5B4F">
+        {pct}%
+      </text>
+    </svg>
+  )
+}
 
 export default function CyclePage() {
   const { data, updateData } = useAppData()
@@ -13,6 +50,7 @@ export default function CyclePage() {
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [newTaskIcon, setNewTaskIcon] = useState('🧹')
   const [newTaskFreq, setNewTaskFreq] = useState<RecurringFrequency>('weekly')
+  const [newTaskCustomDays, setNewTaskCustomDays] = useState(7)
 
   // Todo state
   const [showAddTodo, setShowAddTodo] = useState(false)
@@ -20,17 +58,35 @@ export default function CyclePage() {
 
   const ICONS = ['🧹', '🗑️', '🛏️', '💆', '📦', '🌿', '🧺', '🪴', '🍳', '💊']
 
+  const freqLabel: Record<RecurringFrequency, string> = {
+    weekly: '每周',
+    monthly: '每月',
+    yearly: '每年',
+    custom: '自定',
+  }
+
+  const getFreqDisplay = (task: RecurringTask): string => {
+    if (task.frequency === 'custom' && task.customDays) {
+      return `每${task.customDays}天`
+    }
+    return freqLabel[task.frequency]
+  }
+
   const addTask = () => {
     if (!newTaskTitle.trim()) return
     updateData(d => {
       d.recurringTasks = d.recurringTasks || []
-      d.recurringTasks.push({
+      const taskData: RecurringTask = {
         id: `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
         title: newTaskTitle.trim(),
         icon: newTaskIcon,
         frequency: newTaskFreq,
         createdAt: new Date().toISOString(),
-      })
+      }
+      if (newTaskFreq === 'custom') {
+        taskData.customDays = newTaskCustomDays
+      }
+      d.recurringTasks.push(taskData)
     })
     setNewTaskTitle('')
     setShowAddTask(false)
@@ -91,133 +147,15 @@ export default function CyclePage() {
     })
   }
 
-  const freqLabel: Record<RecurringFrequency, string> = {
-    weekly: '每周',
-    monthly: '每月',
-    yearly: '每年',
-  }
-
   return (
     <div className="py-6">
-      <h2 className="text-base font-medium text-caramel text-center mb-6">🔄 循环</h2>
+      <h2 className="text-lg font-medium text-caramel text-center mb-6">在循环中流动</h2>
 
-      {/* ===== 循环事项 ===== */}
+      {/* ===== 记得要做 (Todos first) ===== */}
       <div className="mb-8">
         <div className="flex items-center gap-2 mb-3">
-          <div className="w-1 h-5 bg-sage rounded-full" />
-          <span className="text-sm font-medium text-caramel">循环事项</span>
-        </div>
-
-        {tasks.length === 0 && !showAddTask && (
-          <div className="bg-cream rounded-xl py-5 text-center border border-dashed border-warm-gray mb-3">
-            <p className="text-xs text-light-brown">还没有循环事项</p>
-          </div>
-        )}
-
-        <div className="flex flex-col gap-2">
-          {tasks.map(task => {
-            const completed = isCompletedThisCycle(task)
-            const daysLeft = getDaysUntilNextReset(task)
-            return (
-              <div key={task.id} className={`bg-white rounded-xl px-4 py-3 border transition-all ${
-                completed ? 'border-sage/30 opacity-60' : 'border-warm-gray'
-              }`}>
-                <div className="flex items-center gap-3">
-                  <span className="text-xl">{task.icon}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-sm ${completed ? 'text-deep-brown line-through' : 'text-caramel'}`}>
-                        {task.title}
-                      </span>
-                      <span className="text-[10px] text-light-brown bg-cream px-1.5 py-0.5 rounded">
-                        {freqLabel[task.frequency]}
-                      </span>
-                    </div>
-                    <div className="text-xs mt-0.5">
-                      {completed ? (
-                        <span className="text-sage">✓ 已完成 · 距重置还有 {daysLeft} 天</span>
-                      ) : (
-                        <span className={daysLeft <= 1 ? 'text-amber-600 font-medium' : 'text-deep-brown'}>
-                          还有 {daysLeft} 天
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex gap-1">
-                    {completed ? (
-                      <button onClick={() => unmarkTaskDone(task.id)}
-                        className="text-xs px-2.5 py-1 rounded-lg bg-cream text-deep-brown border border-warm-gray hover:bg-warm-gray transition-colors">
-                        撤销
-                      </button>
-                    ) : (
-                      <button onClick={() => markTaskDone(task.id)}
-                        className="text-xs px-2.5 py-1 rounded-lg bg-sage text-white hover:bg-sage/90 transition-colors">
-                        ✓
-                      </button>
-                    )}
-                    <button onClick={() => deleteTask(task.id)}
-                      className="text-xs px-2 py-1 rounded-lg text-light-brown hover:text-deep-brown transition-colors">
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Add recurring task */}
-        {showAddTask ? (
-          <div className="bg-white rounded-xl px-4 py-4 border border-sage mt-2">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-xs text-deep-brown">选择图标:</span>
-              <div className="flex gap-1 flex-wrap">
-                {ICONS.map(ic => (
-                  <button key={ic} onClick={() => setNewTaskIcon(ic)}
-                    className={`text-lg w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
-                      newTaskIcon === ic ? 'bg-sage text-white' : 'bg-cream hover:bg-warm-gray'
-                    }`}>{ic}</button>
-                ))}
-              </div>
-            </div>
-            <input autoFocus value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)}
-              placeholder="比如：扫地拖地"
-              className="w-full text-sm text-caramel bg-cream rounded-lg px-3 py-2 outline-none mb-2 placeholder:text-light-brown"
-              onKeyDown={e => e.key === 'Enter' && addTask()}
-            />
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-xs text-deep-brown">频率:</span>
-              {(['weekly', 'monthly', 'yearly'] as RecurringFrequency[]).map(f => (
-                <button key={f} onClick={() => setNewTaskFreq(f)}
-                  className={`text-xs px-3 py-1 rounded-lg transition-colors ${
-                    newTaskFreq === f ? 'bg-sage text-white' : 'bg-cream text-deep-brown border border-warm-gray'
-                  }`}>{freqLabel[f]}</button>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <button onClick={addTask} disabled={!newTaskTitle.trim()}
-                className="flex-1 py-2 rounded-lg text-sm text-white bg-sage disabled:opacity-40 transition-opacity">
-                ✓ 添加
-              </button>
-              <button onClick={() => setShowAddTask(false)}
-                className="px-4 py-2 rounded-lg text-sm text-deep-brown bg-cream border border-warm-gray">
-                取消
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button onClick={() => setShowAddTask(true)}
-            className="mt-2 w-full py-2.5 rounded-xl text-sm text-deep-brown bg-cream border border-dashed border-light-brown hover:bg-warm-gray transition-colors">
-            + 添加循环事项
-          </button>
-        )}
-      </div>
-
-      {/* ===== 临时待办 ===== */}
-      <div>
-        <div className="flex items-center gap-2 mb-3">
           <div className="w-1 h-5 bg-light-brown rounded-full" />
-          <span className="text-sm font-medium text-caramel">临时待办</span>
+          <span className="text-sm font-medium text-caramel">记得要做</span>
         </div>
 
         {todos.length === 0 && !showAddTodo && (
@@ -238,7 +176,7 @@ export default function CyclePage() {
                   }`}>
                   {todo.completed ? '✓' : ''}
                 </span>
-                <span className={`flex-1 text-sm ${todo.completed ? 'text-deep-brown line-through' : 'text-caramel'}`}>
+                <span onClick={() => toggleTodo(todo.id)} className={`flex-1 text-sm cursor-pointer ${todo.completed ? 'text-deep-brown line-through' : 'text-caramel'}`}>
                   {todo.text}
                 </span>
                 <button onClick={() => deleteTodo(todo.id)}
@@ -270,6 +208,137 @@ export default function CyclePage() {
           <button onClick={() => setShowAddTodo(true)}
             className="mt-2 w-full py-2.5 rounded-xl text-sm text-deep-brown bg-cream border border-dashed border-light-brown hover:bg-warm-gray transition-colors">
             + 添加待办
+          </button>
+        )}
+      </div>
+
+      {/* ===== 生活循环 ===== */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-1 h-5 bg-sage rounded-full" />
+          <span className="text-sm font-medium text-caramel">生活循环</span>
+        </div>
+
+        {tasks.length === 0 && !showAddTask && (
+          <div className="bg-cream rounded-xl py-5 text-center border border-dashed border-warm-gray mb-3">
+            <p className="text-xs text-light-brown">还没有循环事项</p>
+          </div>
+        )}
+
+        <div className="flex flex-col gap-2">
+          {tasks
+            .sort((a, b) => {
+              const aDone = isCompletedThisCycle(a) ? 1 : 0
+              const bDone = isCompletedThisCycle(b) ? 1 : 0
+              return aDone - bDone
+            })
+            .map(task => {
+              const completed = isCompletedThisCycle(task)
+              return (
+              <div key={task.id} className={`bg-white rounded-xl px-4 py-3 border transition-all ${
+                completed ? 'border-sage/30 opacity-60' : 'border-warm-gray'
+              }`}>
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">{task.icon}</span>
+                  <CircularProgress task={task} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-sm ${completed ? 'text-deep-brown line-through' : 'text-caramel'}`}>
+                        {task.title}
+                      </span>
+                      <span className="text-[10px] text-light-brown bg-cream px-1.5 py-0.5 rounded">
+                        {getFreqDisplay(task)}
+                      </span>
+                    </div>
+                    <div className="text-xs mt-0.5">
+                      {completed ? (
+                        <span className="text-sage">✓ 已完成 · 距重置还有 {getDaysUntilNextReset(task)} 天</span>
+                      ) : (
+                        <span className={getDaysUntilNextReset(task) <= 1 ? 'text-amber-600 font-medium' : 'text-deep-brown'}>
+                          还有 {getDaysUntilNextReset(task)} 天
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-1 items-center">
+                    {completed ? (
+                      <button onClick={() => unmarkTaskDone(task.id)}
+                        className="text-xs px-2.5 py-1 rounded-lg bg-cream text-deep-brown border border-warm-gray hover:bg-warm-gray transition-colors">
+                        撤销
+                      </button>
+                    ) : (
+                      <button onClick={() => markTaskDone(task.id)}
+                        className="w-8 h-8 rounded-full bg-sage text-white flex items-center justify-center hover:bg-sage/90 transition-colors text-sm">
+                        ✓
+                      </button>
+                    )}
+                    <button onClick={() => deleteTask(task.id)}
+                      className="text-xs px-1.5 py-1 rounded-lg text-light-brown hover:text-deep-brown transition-colors">
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Add recurring task */}
+        {showAddTask ? (
+          <div className="bg-white rounded-xl px-4 py-4 border border-sage mt-2">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xs text-deep-brown">选择图标:</span>
+              <div className="flex gap-1 flex-wrap">
+                {ICONS.map(ic => (
+                  <button key={ic} onClick={() => setNewTaskIcon(ic)}
+                    className={`text-lg w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
+                      newTaskIcon === ic ? 'bg-sage text-white' : 'bg-cream hover:bg-warm-gray'
+                    }`}>{ic}</button>
+                ))}
+              </div>
+            </div>
+            <input autoFocus value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)}
+              placeholder="比如：扫地拖地"
+              className="w-full text-sm text-caramel bg-cream rounded-lg px-3 py-2 outline-none mb-2 placeholder:text-light-brown"
+              onKeyDown={e => e.key === 'Enter' && addTask()}
+            />
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xs text-deep-brown">频率:</span>
+              {(['weekly', 'monthly', 'yearly', 'custom'] as RecurringFrequency[]).map(f => (
+                <button key={f} onClick={() => setNewTaskFreq(f)}
+                  className={`text-xs px-3 py-1 rounded-lg transition-colors ${
+                    newTaskFreq === f ? 'bg-sage text-white' : 'bg-cream text-deep-brown border border-warm-gray'
+                  }`}>{f === 'custom' ? '自定' : freqLabel[f]}</button>
+              ))}
+            </div>
+            {newTaskFreq === 'custom' && (
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs text-deep-brown">每</span>
+                <div className="flex bg-cream rounded-lg border border-warm-gray overflow-hidden">
+                  <button onClick={() => setNewTaskCustomDays(Math.max(1, newTaskCustomDays - 1))}
+                    className="px-2 py-1 text-xs text-deep-brown hover:bg-warm-gray">−</button>
+                  <span className="px-3 py-1 text-xs text-caramel font-medium min-w-[2rem] text-center">{newTaskCustomDays}</span>
+                  <button onClick={() => setNewTaskCustomDays(Math.min(365, newTaskCustomDays + 1))}
+                    className="px-2 py-1 text-xs text-deep-brown hover:bg-warm-gray">+</button>
+                </div>
+                <span className="text-xs text-deep-brown">天</span>
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button onClick={addTask} disabled={!newTaskTitle.trim()}
+                className="flex-1 py-2 rounded-lg text-sm text-white bg-sage disabled:opacity-40 transition-opacity">
+                ✓ 添加
+              </button>
+              <button onClick={() => setShowAddTask(false)}
+                className="px-4 py-2 rounded-lg text-sm text-deep-brown bg-cream border border-warm-gray">
+                取消
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => setShowAddTask(true)}
+            className="mt-2 w-full py-2.5 rounded-xl text-sm text-deep-brown bg-cream border border-dashed border-light-brown hover:bg-warm-gray transition-colors">
+            + 添加循环事项
           </button>
         )}
       </div>
