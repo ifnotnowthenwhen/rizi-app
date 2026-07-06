@@ -110,6 +110,7 @@ export interface RecurringTask {
   customValue?: number
   customUnit?: CustomUnit
   lastCompletedDate?: string  // ISO date when user last marked as done
+  completedCount?: number  // total completions this year
   createdAt: string
 }
 
@@ -126,6 +127,7 @@ export interface AppData {
   records: DayRecord[]
   recurringTasks: RecurringTask[]
   todos: TodoItem[]
+  cycleYear?: number  // year these cycle counts belong to
 }
 
 // ===== 模块标识 =====

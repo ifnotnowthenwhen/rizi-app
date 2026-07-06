@@ -3,42 +3,49 @@ import { useAppData } from '../hooks/useLocalStorage'
 import { getDaysUntilNextReset, isCompletedThisCycle } from '../utils/storage'
 import type { RecurringTask, CustomUnit, RecurringFrequency } from '../types'
 
-const CONFETTI_COLORS = ['#A8B5A2', '#D4C5A9', '#E8E0D0', '#8B7E74', '#6B5B4F', '#F5F0E8']
+const CONFETTI_COLORS = ['#FF6B6B', '#FFD93D', '#6BCB77', '#4D96FF', '#FF8E9E', '#C084FC', '#FB923C']
 
 function ConfettiEffect({ trigger }: { trigger: number }) {
-  const [particles, setParticles] = useState<{ id: number; left: number; color: string; size: number; delay: number; rotate: number }[]>([])
+  const [particles, setParticles] = useState<{ id: number; x: number; y: number; color: string; size: number; delay: number; rotation: number }[]>([])
 
   useEffect(() => {
     if (trigger === 0) return
-    const newParticles = Array.from({ length: 20 }, (_, i) => ({
-      id: trigger * 1000 + i,
-      left: 20 + Math.random() * 60,
-      color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
-      size: 6 + Math.random() * 8,
-      delay: Math.random() * 0.4,
-      rotate: Math.random() * 360,
-    }))
+    const newParticles = Array.from({ length: 24 }, (_, i) => {
+      const angle = (i / 24) * 360
+      const distance = 100 + Math.random() * 200
+      const rad = (angle * Math.PI) / 180
+      return {
+        id: trigger * 1000 + i,
+        x: Math.cos(rad) * distance,
+        y: Math.sin(rad) * distance - 80, // bias upward
+        color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+        size: 5 + Math.random() * 7,
+        delay: Math.random() * 0.15,
+        rotation: Math.random() * 720,
+      }
+    })
     setParticles(newParticles)
-    const timer = setTimeout(() => setParticles([]), 3000)
+    const timer = setTimeout(() => setParticles([]), 2500)
     return () => clearTimeout(timer)
   }, [trigger])
 
   if (particles.length === 0) return null
 
   return (
-    <div className="fixed inset-0 pointer-events-none z-[100]">
+    <div className="fixed inset-0 pointer-events-none z-[100] flex items-center justify-center">
       {particles.map(p => (
         <div
           key={p.id}
           className="confetti-particle"
           style={{
-            left: `${p.left}%`,
+            '--x': `${p.x}px`,
+            '--y': `${p.y}px`,
             backgroundColor: p.color,
             width: `${p.size}px`,
             height: `${p.size * 0.6}px`,
             animationDelay: `${p.delay}s`,
-            transform: `rotate(${p.rotate}deg)`,
-          }}
+            borderRadius: '3px',
+          } as React.CSSProperties}
         />
       ))}
     </div>
@@ -130,6 +137,7 @@ export default function CyclePage() {
       const task = (d.recurringTasks || []).find(t => t.id === id)
       if (task) {
         task.lastCompletedDate = new Date().toISOString()
+        task.completedCount = (task.completedCount || 0) + 1
       }
     })
     setConfettiTrigger(prev => prev + 1)
@@ -178,33 +186,41 @@ export default function CyclePage() {
   return (
     <div className="py-6">
 
-      {/* Stats card */}
+      {/* Stats card - cumulative yearly counter */}
       {tasks.length > 0 && (() => {
-        const completedThisCycle = tasks.filter(t => isCompletedThisCycle(t)).length
-        const totalTasks = tasks.length
+        const totalCompletions = tasks.reduce((sum, t) => sum + (t.completedCount || 0), 0)
         return (
-          <div className="bg-white rounded-2xl px-5 py-4 border border-warm-gray shadow-sm mb-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-sage/10 flex items-center justify-center">
-                  <span className="text-lg">🌘</span>
-                </div>
-                <div>
-                  <div className="text-xs text-deep-brown">本周生活循环</div>
-                  <div className="text-lg font-medium text-caramel mt-0.5">
-                    {completedThisCycle}/{totalTasks} <span className="text-xs font-normal text-deep-brown">已完成</span>
-                  </div>
-                </div>
+          <div className="bg-white rounded-2xl px-5 py-5 border border-warm-gray shadow-sm mb-6">
+            <div className="flex items-center gap-4">
+              {/* Animated ring counter */}
+              <div className="relative w-16 h-16 flex items-center justify-center flex-shrink-0">
+                <svg className="absolute inset-0" width="64" height="64" viewBox="0 0 64 64">
+                  {/* Background ring */}
+                  <circle cx="32" cy="32" r="26" fill="none" stroke="#E8E0D0" strokeWidth="3" />
+                  {/* Progress ring */}
+                  <circle cx="32" cy="32" r="26" fill="none" stroke="#A8B5A2" strokeWidth="3"
+                    strokeDasharray={163.36}
+                    strokeDashoffset={163.36 * (1 - Math.min(1, totalCompletions / 365))}
+                    strokeLinecap="round"
+                    transform="rotate(-90 32 32)"
+                    className="transition-all duration-1000 ease-out" />
+                </svg>
+                <span className="text-xl font-light text-caramel">{totalCompletions}</span>
               </div>
-              <div className="text-right">
-                <div className="text-2xl font-light text-sage">{Math.round((completedThisCycle / Math.max(1, totalTasks)) * 100)}%</div>
-                <div className="text-[10px] text-light-brown">完成率</div>
+              {/* Text */}
+              <div>
+                <div className="text-xs text-deep-brown tracking-wide">今年已完成的循环</div>
+                <div className="text-base text-caramel font-medium mt-0.5">{totalCompletions} 次</div>
+                <div className="text-[11px] text-light-brown mt-0.5">每一次完成都是生活的印记 ✨</div>
               </div>
             </div>
-            {/* Mini progress bar */}
-            <div className="mt-3 h-1.5 bg-warm-gray rounded-full overflow-hidden">
-              <div className="h-full bg-sage rounded-full transition-all duration-500"
-                style={{ width: `${(completedThisCycle / Math.max(1, totalTasks)) * 100}%` }} />
+            {/* Mini progress toward 365 */}
+            <div className="mt-3.5 flex items-center gap-2">
+              <div className="flex-1 h-1.5 bg-warm-gray rounded-full overflow-hidden">
+                <div className="h-full bg-sage rounded-full transition-all duration-700 ease-out"
+                  style={{ width: `${Math.min(100, (totalCompletions / 365) * 100)}%` }} />
+              </div>
+              <span className="text-[10px] text-light-brown">{Math.min(100, Math.round((totalCompletions / 365) * 100))}%</span>
             </div>
           </div>
         )

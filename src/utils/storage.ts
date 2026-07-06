@@ -32,6 +32,18 @@ export function loadAppData(): AppData {
         // Handle old data that doesn't have new fields
         if (!data.recurringTasks) data.recurringTasks = []
         if (!data.todos) data.todos = []
+
+        // Yearly cycle reset
+        const currentYear = new Date().getFullYear()
+        if (data.cycleYear !== currentYear) {
+          for (const task of data.recurringTasks) {
+            task.completedCount = 0
+            task.lastCompletedDate = undefined
+          }
+          data.cycleYear = currentYear
+          saveAppData(data)
+        }
+
         return data
       }
     }
