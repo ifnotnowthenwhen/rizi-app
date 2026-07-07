@@ -79,11 +79,7 @@ export default function HomePage() {
       if (planIdx === -1) return
       foundPlan = plans[planIdx]
 
-      // Remove the specific plan
-      record.modules[module].plans = [
-        ...plans.slice(0, planIdx),
-        ...plans.slice(planIdx + 1),
-      ] as any
+      // Keep the plan (don't remove — show as strikethrough until 5AM reset)
 
       // Add to dones
       const now = new Date().toISOString()
@@ -191,21 +187,19 @@ export default function HomePage() {
                       const isDone = moduleData.dones.some(d => d.type === plan.type && (d.customText || '') === (plan.customText || ''))
                       const label = getPlanLabel(m.key, plan.type, plan.customText)
 
-                      if (isDone) return null // Don't show done items
-
                       return (
                         <div
                           key={plan.id || plan.type + (plan.customText || '')}
-                          onClick={() => handleItemDone(m.key, getItemKey(plan))}
-                          className="flex items-center gap-3 py-2 px-3 rounded-xl hover:bg-cream cursor-pointer group transition-colors"
+                          onClick={() => !isDone && handleItemDone(m.key, getItemKey(plan))}
+                          className={`flex items-center gap-3 py-2 px-3 rounded-xl transition-colors ${isDone ? 'opacity-40 cursor-default' : 'hover:bg-cream cursor-pointer group'}`}
                         >
-                          <span className="w-5 h-5 rounded-full border-2 border-light-brown flex items-center justify-center group-hover:border-sage transition-colors flex-shrink-0">
-                            <span className="w-2 h-2 rounded-full bg-transparent group-hover:bg-sage transition-colors" />
+                          <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0 ${isDone ? 'bg-sage border-sage' : 'border-light-brown group-hover:border-sage'}`}>
+                            {isDone ? <span className="text-white text-xs">✓</span> : <span className="w-2 h-2 rounded-full bg-transparent group-hover:bg-sage transition-colors" />}
                           </span>
-                          <span className="text-sm text-caramel flex-1">{label}</span>
-                          <span className="text-xs text-light-brown opacity-0 group-hover:opacity-100 transition-opacity">
-                            点击完成
-                          </span>
+                          <span className={`text-sm flex-1 ${isDone ? 'text-deep-brown line-through' : 'text-caramel'}`}>{label}</span>
+                          {!isDone && (
+                            <span className="text-xs text-light-brown opacity-0 group-hover:opacity-100 transition-opacity">点击完成</span>
+                          )}
                         </div>
                       )
                     })}
